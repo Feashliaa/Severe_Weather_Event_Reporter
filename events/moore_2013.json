@@ -1,0 +1,29 @@
+{
+    "event_name": "Moore Tornado",
+    "event_date": "May 20, 2013",
+    "location": "Moore, Oklahoma",
+    "local_timezone": "America/Chicago",
+    "radar_site": "KTLX",
+    "window_start_utc": "2013-05-20T19:30:00Z",
+    "window_end_utc": "2013-05-20T21:00:00Z",
+    "zoom_lat": 35.339,
+    "zoom_lon": -97.486,
+    "zoom_km": 60.0,
+    "max_radar_scans": 8,
+    "vtec_events": [
+        {
+            "wfo": "OUN",
+            "year": 2013,
+            "phenomena": "TO",
+            "significance": "W",
+            "etn": 26
+        },
+        {
+            "wfo": "OUN",
+            "year": 2013,
+            "phenomena": "TO",
+            "significance": "W",
+            "etn": 29
+        }
+    ]
+}

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Severe Weather Event Reporter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Leaflet (loaded but map not initialized yet — we use the geosearch control standalone) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@4.0.0/dist/geosearch.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-geosearch@4.0.0/dist/geosearch.umd.js"></script>
+</head>
+
+<body class="bg-[#deeefb] text-slate-900 min-h-screen">
+
+    <div class="bg-[#003a8c] border-b-4 border-yellow-400">
+        <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+            <div class="bg-yellow-400 text-[#003a8c] font-black px-3 py-1 text-xs tracking-widest"
+                style="font-family: 'Oswald', sans-serif;">SWX</div>
+            <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter</div>
+        </div>
+    </div>
+
+    <div class="max-w-3xl mx-auto px-4 py-8">
+        <div class="bg-white border-2 border-[#003a8c] shadow-[3px_3px_0_rgba(0,58,140,0.15)]">
+            <div class="bg-[#003a8c] text-white px-4 py-2 border-b-2 border-yellow-400 flex justify-between items-center"
+                style="font-family: 'Oswald', sans-serif;">
+                <span class="font-bold uppercase tracking-wider text-sm">Generate New Report</span>
+            </div>
+
+            <form id="report-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-1">Event
+                        Name</label>
+                    <input name="event_name" type="text" required placeholder="e.g., Joplin Tornado"
+                        class="w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-1">Location</label>
+                    <div id="location-search" class="relative"></div>
+                    <input type="hidden" name="location" id="location-display">
+                    <input type="hidden" name="lat" id="location-lat">
+                    <input type="hidden" name="lon" id="location-lon">
+                    <p id="location-resolved" class="text-xs text-slate-600 mt-1 italic hidden"></p>
+                    <p class="text-xs text-slate-500 mt-1">Search for a city, town, or county. Pick from the dropdown to
+                        disambiguate.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-1">Date</label>
+                    <input name="date" type="date" required
+                        class="w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-2">Time
+                        Zone</label>
+                    <div class="flex items-center gap-4">
+                        <label class="flex items-center gap-2 text-sm cursor-pointer">
+                            <input type="radio" name="tz_mode" value="local" checked class="accent-[#003a8c]">
+                            <span>Local Time</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm cursor-pointer">
+                            <input type="radio" name="tz_mode" value="utc" class="accent-[#003a8c]">
+                            <span>UTC</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-1">
+                            Start Time <span id="start-tz-label"
+                                class="text-slate-500 font-normal lowercase">(local)</span>
+                        </label>
+                        <input name="start_time" type="time" value="18:00"
+                            class="w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-1">
+                            End Time <span id="end-tz-label" class="text-slate-500 font-normal lowercase">(local)</span>
+                        </label>
+                        <input name="end_time" type="time" value="06:00"
+                            class="w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" id="submit-btn"
+                        class="w-full bg-[#003a8c] text-yellow-400 font-bold uppercase tracking-widest px-4 py-3 hover:bg-yellow-400 hover:text-[#003a8c] transition-colors border-2 border-[#003a8c]"
+                        style="font-family: 'Oswald', sans-serif;">
+                        ▶ Generate Report
+                    </button>
+                </div>
+            </form>
+
+            <div id="status" class="hidden border-t-2 border-slate-300 bg-slate-50 px-6 py-4">
+                <p class="text-sm font-mono text-slate-700"></p>
+            </div>
+        </div>
+
+        <p class="text-xs text-slate-600 mt-4 text-center">Reports take 1-3 minutes to generate.</p>
+    </div>
+
+    <script src="/static/form.js" defer></script>
+
+</body>
+
+</html>

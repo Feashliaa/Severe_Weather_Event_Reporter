@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ report.event_name }} - Severe Weather Event Report</title>
+    {% if report.feature_notes %}
+    <section class="mb-4">
+        <div class="border-2 border-amber-500 bg-amber-50 p-4">
+            <div class="flex items-start gap-3">
+                <span class="text-amber-700 font-bold text-lg">⚠</span>
+                <div class="flex-1">
+                    <p class="font-bold text-amber-900 uppercase tracking-wide text-sm mb-2"
+                        style="font-family: 'Oswald', sans-serif;">
+                        Data Availability Notes
+                    </p>
+                    <ul class="space-y-1">
+                        {% for note in report.feature_notes %}
+                        <li class="text-sm text-amber-900">{{ note }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=VT323&family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="static/report.css">
+</head>
+
+<body class="bg-[#deeefb] text-slate-900 min-h-screen">
+
+    <!-- "TV Banner" header -->
+    <div class="bg-[#003a8c] border-b-4 border-yellow-400">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-yellow-400 text-[#003a8c] font-black px-3 py-1 text-xs tracking-widest"
+                    style="font-family: 'Oswald', sans-serif;">SWX</div>
+                <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter
+                </div>
+            </div>
+            <div class="text-yellow-400 text-xs font-mono">{{ report.event_date }}</div>
+        </div>
+    </div>
+
+
+    <!-- Sticky section nav -->
+    <nav class="sticky top-0 z-40 bg-[#003a8c] border-b-2 border-yellow-400 shadow-md">
+        <div class="max-w-5xl mx-auto px-2 md:px-4">
+            <div class="flex overflow-x-auto -mx-2 px-2">
+                <a href="#narrative" class="nav-tab">📋 NARRATIVE</a>
+                {% if report.radar_images %}<a href="#radar" class="nav-tab">📡 RADAR</a>{% endif %}
+                {% if report.radar_features %}<a href="#scans" class="nav-tab">📊 SCANS</a>{% endif %}
+                {% if report.warnings %}<a href="#warnings" class="nav-tab">⚠️ WARNINGS</a>{% endif %}
+                {% if report.lsrs %}<a href="#lsrs" class="nav-tab">📍 LSRS</a>{% endif %}
+            </div>
+        </div>
+    </nav>
+
+
+    <div class="max-w-5xl mx-auto px-3 md:px-4 py-4 md:py-6">
+
+        <!-- Event title card - TWC style -->
+        <header class="tv-card mb-4">
+            <div class="tv-card-header">
+                <span class="tv-header-tag">EVENT REPORT</span>
+                <span class="tv-header-location">{{ report.location | upper }}</span>
+            </div>
+            <div class="bg-gradient-to-b from-[#003a8c] to-[#001f4d] p-6 md:p-10">
+                <h1 class="text-white text-4xl md:text-6xl font-black tracking-tight leading-none drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]"
+                    style="font-family: 'Oswald', sans-serif;">
+                    {{ report.event_name | upper }}
+                </h1>
+                <p class="text-yellow-400 text-lg md:text-2xl mt-3 font-bold drop-shadow-[1px_1px_0_rgba(0,0,0,0.5)]"
+                    style="font-family: 'Oswald', sans-serif;">
+                    {{ report.event_date }}
+                </p>
+            </div>
+        </header>
+
+        <!-- Narrative card - .gov style document -->
+        <section id="narrative" class="gov-card mb-4 scroll-mt-20">
+
+            <details open>
+
+                <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
+                    <span>EVENT NARRATIVE</span>
+                    <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                </summary>
+
+                <article
+                    class="p-5 md:p-7 prose prose-slate max-w-none
+                            prose-headings:font-bold prose-headings:text-[#003a8c]
+                            prose-h1:hidden
+                            prose-h2:text-lg md:prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2 prose-h2:pb-1 prose-h2:border-b-2 prose-h2:border-yellow-400 prose-h2:uppercase prose-h2:tracking-wide
+                            prose-h2:first-of-type:mt-0
+                            prose-h3:text-base prose-h3:mt-4 prose-h3:mb-2 prose-h3:text-[#003a8c]
+                            prose-p:text-slate-900 prose-p:leading-relaxed
+                            prose-strong:text-[#003a8c] prose-strong:font-bold
+                            prose-li:text-slate-900
+                            prose-code:text-[#003a8c] prose-code:bg-yellow-100 prose-code:px-1 prose-code:font-bold prose-code:before:content-none prose-code:after:content-none">
+                    {{ report.narrative | safe }}
+                </article>
+            </details>
+        </section>
+
+        {% if report.radar_images %}
+        <section id="radar" class="gov-card mb-4 scroll-mt-20">
+            <details open>
+                <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
+                    <span>RADAR LOOP</span>
+                    <span class="flex items-center gap-2">
+                        <span class="gov-header-count">{{ report.radar_images | length }} FRAMES</span>
+                        <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                    </span>
+                </summary>
+                <div class="p-5 md:p-7">
+                    <!-- Animated loop -->
+                    <figure class="border-2 border-[#003a8c] bg-white mb-4">
+                        <div
+                            class="bg-[#003a8c] text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 flex justify-between items-center">
+                            <span id="loop-frame-label">FRAME 01 OF {{ "%02d" % (report.radar_images | length) }}</span>
+                            <span class="font-mono text-yellow-400" id="loop-timestamp">{{
+                                report.radar_features[0].timestamp[:19] if report.radar_features else "" }}</span>
+                        </div>
+                        <button type="button" id="loop-expand"
+                            class="block w-full cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            aria-label="Expand to view all frames">
+                            <img id="loop-img" src="{{ report.radar_images[0] }}" alt="Radar loop" class="w-full"
+                                data-frames='{{ report.radar_images | tojson }}'
+                                data-timestamps='{{ report.radar_features | map(attribute="timestamp") | list | tojson }}'>
+                        </button>
+
+                        <!-- Controls -->
+                        <div class="bg-slate-50 border-t border-slate-300 px-3 py-2 flex items-center gap-3">
+                            <button id="loop-playpause" type="button"
+                                class="bg-[#003a8c] text-yellow-400 font-bold px-3 py-1 text-xs uppercase tracking-wider hover:bg-yellow-400 hover:text-[#003a8c] transition-colors"
+                                style="font-family: 'Oswald', sans-serif;">
+                                ⏸ PAUSE
+                            </button>
+                            <input id="loop-scrubber" type="range" min="0"
+                                max="{{ (report.radar_images | length) - 1 }}" value="0" class="flex-1 accent-[#003a8c]"
+                                aria-label="Scrub frames">
+                            <select id="loop-speed"
+                                class="text-xs border border-slate-400 bg-white px-2 py-1 font-mono">
+                                <option value="2000">0.5x</option>
+                                <option value="1000" selected>1x</option>
+                                <option value="500">2x</option>
+                                <option value="250">4x</option>
+                            </select>
+                        </div>
+
+                        <figcaption class="px-3 py-1.5 text-xs text-slate-700 border-t border-slate-300 bg-slate-50">
+                            Base Reflectivity &amp; Velocity (0.5°) — Click image to view all frames
+                        </figcaption>
+                    </figure>
+                </div>
+            </details>
+        </section>
+        {% endif %}
+
+        {% if report.radar_features %}
+        <section id="scans" class="gov-card mb-4 scroll-mt-20">
+            <details open>
+
+                <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
+                    <span>VOLUME SCAN ANALYSIS</span>
+                    <span class="flex items-center gap-2">
+                        <span class="gov-header-count">{{ report.radar_features | length }} VOLUMES</span>
+                        <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                    </span>
+                </summary>
+
+                <div class="p-3 md:p-5">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm border-collapse">
+                            <thead>
+                                <tr class="bg-[#003a8c] text-white">
+                                    <th
+                                        class="px-3 py-2 text-left text-xs uppercase tracking-wider font-bold border border-[#001f4d]">
+                                        Time (UTC)</th>
+                                    <th
+                                        class="px-3 py-2 text-right text-xs uppercase tracking-wider font-bold border border-[#001f4d]">
+                                        Max dBZ</th>
+                                    <th
+                                        class="px-3 py-2 text-right text-xs uppercase tracking-wider font-bold border border-[#001f4d]">
+                                        Max Z (kft)</th>
+                                    <th
+                                        class="px-3 py-2 text-right text-xs uppercase tracking-wider font-bold border border-[#001f4d]">
+                                        18 Top</th>
+                                    <th
+                                        class="px-3 py-2 text-right text-xs uppercase tracking-wider font-bold border border-[#001f4d]">
+                                        50 Top</th>
+                                    <th
+                                        class="px-3 py-2 text-right text-xs uppercase tracking-wider font-bold border border-[#001f4d]">
+                                        Vel In</th>
+                                    <th
+                                        class="px-3 py-2 text-right text-xs uppercase tracking-wider font-bold border border-[#001f4d]">
+                                        Vel Out</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white">
+                                {% for rf in report.radar_features %}
+                                <tr class="{% if loop.index0 % 2 == 1 %}bg-blue-50{% endif %} hover:bg-yellow-50">
+                                    <td class="px-3 py-2 font-mono text-slate-900 border border-slate-300">{{
+                                        rf.timestamp[:19] }}</td>
+                                    <td
+                                        class="px-3 py-2 text-right font-mono font-bold text-red-700 border border-slate-300">
+                                        {{ rf.max_reflectivity_dbz }}</td>
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
+                                        rf.max_reflectivity_height_kft }}</td>
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
+                                        rf.echo_top_18dbz_kft if rf.echo_top_18dbz_kft is not none else "—" }}</td>
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
+                                        rf.echo_top_50dbz_kft if rf.echo_top_50dbz_kft is not none else "—" }}</td>
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
+                                        rf.max_inbound_velocity_kt if rf.max_inbound_velocity_kt is not none else "—" }}
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
+                                        rf.max_outbound_velocity_kt if rf.max_outbound_velocity_kt is not none else "—"
+                                        }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+        </section>
+        {% endif %}
+
+        {% if report.warnings %}
+        <section id="warnings" class="gov-card mb-4 scroll-mt-20">
+
+            <details open>
+                <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
+                    <span>ACTIVE WARNINGS</span>
+                    <span class="flex items-center gap-2">
+                        <span class="gov-header-count">{{ report.warnings | length }} ISSUED</span>
+                        <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                    </span>
+                </summary>
+                <div class="p-3 md:p-5 space-y-2">
+                    {% for w in report.warnings %}
+                    <div class="border-2 border-red-600 bg-white flex">
+                        <div class="bg-red-600 w-3 shrink-0"></div>
+                        <div class="flex-1 p-3 flex items-start justify-between gap-3 flex-wrap">
+                            <div>
+                                <div class="font-bold text-red-700 uppercase tracking-wide"
+                                    style="font-family: 'Oswald', sans-serif;">{{ w.type }}</div>
+                                <div class="font-mono text-xs text-slate-700 mt-1">Issued: {{ w.issued_at }}</div>
+                                {% if w.expires_at %}<div class="font-mono text-xs text-slate-600">Expires: {{
+                                    w.expires_at
+                                    }}</div>{% endif %}
+                            </div>
+                            {% if w.locations %}
+                            <div class="text-xs text-slate-700 text-right max-w-md">{{ w.locations }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+        </section>
+        {% endif %}
+
+        {% if report.lsrs %}
+        <section id="lsrs" class="gov-card mb-4 scroll-mt-20">
+            <details open>
+                <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
+                    <span>LOCAL STORM REPORTS</span>
+                    <span class="flex items-center gap-2">
+                        <span class="gov-header-count">{{ report.lsrs | length }} REPORTS</span>
+                        <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                    </span>
+                </summary>
+                <div class="p-3 md:p-5 space-y-2">
+                    {% for lsr in report.lsrs %}
+                    {% set is_tornado = lsr.event in ["TORNADO", "FUNNEL CLOUD"] %}
+                    {% set is_hail = lsr.event == "HAIL" %}
+                    <div
+                        class="border-2 {% if is_tornado %}border-red-600{% elif is_hail %}border-blue-600{% else %}border-slate-600{% endif %} bg-white flex">
+                        <div
+                            class="{% if is_tornado %}bg-red-600{% elif is_hail %}bg-blue-600{% else %}bg-slate-600{% endif %} w-3 shrink-0">
+                        </div>
+                        <div class="flex-1 p-3">
+                            <div class="flex items-baseline gap-2 flex-wrap">
+                                <span class="font-mono text-xs text-slate-700">{{ lsr.time | fmt_time }}</span>
+                                {% if lsr.event %}
+                                <span
+                                    class="font-bold uppercase tracking-wide {% if is_tornado %}text-red-700{% elif is_hail %}text-blue-700{% else %}text-slate-700{% endif %}"
+                                    style="font-family: 'Oswald', sans-serif;">{{ lsr.event }}</span>
+                                {% endif %}
+                                {% if lsr.magnitude %}<span class="font-mono font-bold text-slate-900">{{ lsr.magnitude
+                                    }}</span>{% endif %}
+                                {% if lsr.city %}<span class="text-sm text-slate-700">&mdash; {{ lsr.city }}</span>{%
+                                endif
+                                %}
+                            </div>
+                            {% if lsr.remarks %}
+                            <p class="text-sm text-slate-700 leading-relaxed mt-2 font-mono text-xs">{{ lsr.remarks }}
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+        </section>
+        {% endif %}
+
+        <footer class="bg-[#003a8c] text-white p-4 mt-6">
+            <div class="flex items-center justify-between text-xs">
+                <span class="font-bold uppercase tracking-widest">Severe Weather Event Reporter</span>
+                <span class="text-yellow-400 font-mono">DATA: NWS / IEM / NOAA NEXRAD</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Lightbox -->
+    <div id="lightbox" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/95 p-4 cursor-zoom-out"
+        role="dialog" aria-modal="true" aria-label="Image viewer">
+        <button type="button" id="lightbox-close"
+            class="absolute top-4 right-4 text-yellow-400 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center bg-[#003a8c] border-2 border-yellow-400 z-10"
+            aria-label="Close">&times;</button>
+        <button type="button" id="lightbox-prev"
+            class="absolute left-4 top-1/2 -translate-y-1/2 text-yellow-400 hover:text-white text-3xl leading-none w-12 h-12 items-center justify-center bg-[#003a8c] border-2 border-yellow-400 hidden"
+            aria-label="Previous frame">
+            &#9664;
+        </button>
+        <button type="button" id="lightbox-next"
+            class="absolute right-4 top-1/2 -translate-y-1/2 text-yellow-400 hover:text-white text-3xl leading-none w-12 h-12 items-center justify-center bg-[#003a8c] border-2 border-yellow-400 hidden"
+            aria-label="Next frame">&#9654;</button>
+        <figure class="max-w-7xl max-h-full flex flex-col items-center gap-3">
+            <img id="lightbox-img" src="" alt=""
+                class="max-w-full max-h-[85vh] object-contain shadow-2xl bg-white border-4 border-yellow-400">
+            <figcaption id="lightbox-caption" class="text-yellow-400 text-sm font-mono"></figcaption>
+        </figure>
+    </div>
+
+    <script src="static/lightbox.js"></script>
+    <script src="static/radar-loop.js"></script>
+</body>
+
+</html>

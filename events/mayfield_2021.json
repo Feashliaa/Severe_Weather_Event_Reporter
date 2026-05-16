@@ -1,0 +1,17 @@
+{
+    "event_name": "Mayfield Tornado",
+    "event_date": "December 10, 2021",
+    "location": "Mayfield, Kentucky",
+    "local_timezone": "America/Chicago",
+    "radar_site": "KPAH",
+    "window_start_utc": "2021-12-11T02:30:00Z",
+    "window_end_utc": "2021-12-11T04:00:00Z",
+    "zoom_km": 80.0,
+    "lsr_search_km": 200.0,
+    "max_radar_scans": 8,
+    "discover": {
+        "phenomena": [
+            "TO"
+        ]
+    }
+}

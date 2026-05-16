@@ -1,0 +1,35 @@
+# Core
+python-dotenv
+pydantic
+httpx
+
+# Radar processing
+arm-pyart
+nexradaws
+metpy
+
+# Data handling
+numpy
+pandas
+
+# Visualization
+matplotlib
+cartopy
+
+# LLM clients
+anthropic
+openai
+google-genai
+
+# Templating
+jinja2
+
+# Dev
+pytest
+
+# Geocoding
+geopy
+
+fastapi
+uvicorn
+timezonefinder

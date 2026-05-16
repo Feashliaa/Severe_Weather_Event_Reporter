@@ -1,0 +1,1168 @@
+[
+  {
+    "icao": "KABR",
+    "name": "ABERDEEN",
+    "state": "SD",
+    "lat": 45.455833,
+    "lon": -98.413333,
+    "commissioned": "1994-12-01"
+  },
+  {
+    "icao": "KABX",
+    "name": "ALBUQUERQUE",
+    "state": "NM",
+    "lat": 35.149722,
+    "lon": -106.82388,
+    "commissioned": "1994-09-14"
+  },
+  {
+    "icao": "KAKQ",
+    "name": "NORFOLK RICH",
+    "state": "VA",
+    "lat": 36.98405,
+    "lon": -77.007361,
+    "commissioned": "1994-07-23"
+  },
+  {
+    "icao": "KAMA",
+    "name": "AMARILLO",
+    "state": "TX",
+    "lat": 35.233333,
+    "lon": -101.70927,
+    "commissioned": "1994-01-14"
+  },
+  {
+    "icao": "KAMX",
+    "name": "MIAMI",
+    "state": "FL",
+    "lat": 25.611083,
+    "lon": -80.412667,
+    "commissioned": "1993-08-21"
+  },
+  {
+    "icao": "KAPX",
+    "name": "GAYLORD",
+    "state": "MI",
+    "lat": 44.90635,
+    "lon": -84.719533,
+    "commissioned": "1996-05-23"
+  },
+  {
+    "icao": "KARX",
+    "name": "LA CROSSE",
+    "state": "WI",
+    "lat": 43.822778,
+    "lon": -91.191111,
+    "commissioned": "1996-07-08"
+  },
+  {
+    "icao": "KATX",
+    "name": "SEATTLE",
+    "state": "WA",
+    "lat": 48.194611,
+    "lon": -122.49569,
+    "commissioned": "1994-10-27"
+  },
+  {
+    "icao": "KBBX",
+    "name": "BEALE AFB",
+    "state": "CA",
+    "lat": 39.495639,
+    "lon": -121.63161,
+    "commissioned": "1996-10-22"
+  },
+  {
+    "icao": "KBGM",
+    "name": "BINGHAMTON",
+    "state": "NY",
+    "lat": 42.199694,
+    "lon": -75.984722,
+    "commissioned": "1995-11-28"
+  },
+  {
+    "icao": "KBHX",
+    "name": "EUREKA",
+    "state": "CA",
+    "lat": 40.498583,
+    "lon": -124.29216,
+    "commissioned": "1995-05-08"
+  },
+  {
+    "icao": "KBIS",
+    "name": "BISMARCK",
+    "state": "ND",
+    "lat": 46.770833,
+    "lon": -100.76055,
+    "commissioned": "1994-10-18"
+  },
+  {
+    "icao": "KBLX",
+    "name": "BILLINGS",
+    "state": "MT",
+    "lat": 45.853778,
+    "lon": -108.6068,
+    "commissioned": "1995-12-06"
+  },
+  {
+    "icao": "KBMX",
+    "name": "BIRMINGHAM",
+    "state": "AL",
+    "lat": 33.172417,
+    "lon": -86.770167,
+    "commissioned": "1994-05-09"
+  },
+  {
+    "icao": "KBOX",
+    "name": "BOSTON",
+    "state": "MA",
+    "lat": 41.955778,
+    "lon": -71.136861,
+    "commissioned": "1994-11-21"
+  },
+  {
+    "icao": "KBRO",
+    "name": "BROWNSVILLE",
+    "state": "TX",
+    "lat": 25.916,
+    "lon": -97.418967,
+    "commissioned": "1995-05-23"
+  },
+  {
+    "icao": "KBUF",
+    "name": "BUFFALO",
+    "state": "NY",
+    "lat": 42.948789,
+    "lon": -78.736781,
+    "commissioned": "1996-02-23"
+  },
+  {
+    "icao": "KBYX",
+    "name": "KEY WEST",
+    "state": "FL",
+    "lat": 24.5975,
+    "lon": -81.703167,
+    "commissioned": "1996-07-20"
+  },
+  {
+    "icao": "KCAE",
+    "name": "COLUMBIA",
+    "state": "SC",
+    "lat": 33.948722,
+    "lon": -81.118278,
+    "commissioned": "1994-06-27"
+  },
+  {
+    "icao": "KCBW",
+    "name": "HOULTON",
+    "state": "ME",
+    "lat": 46.03925,
+    "lon": -67.806431,
+    "commissioned": "1996-01-11"
+  },
+  {
+    "icao": "KCBX",
+    "name": "BOISE",
+    "state": "ID",
+    "lat": 43.490217,
+    "lon": -116.23603,
+    "commissioned": "1994-01-12"
+  },
+  {
+    "icao": "KCCX",
+    "name": "STATE COLLEGE",
+    "state": "PA",
+    "lat": 40.923167,
+    "lon": -78.003722,
+    "commissioned": "1995-01-13"
+  },
+  {
+    "icao": "KCLE",
+    "name": "CLEVELAND",
+    "state": "OH",
+    "lat": 41.413217,
+    "lon": -81.859867,
+    "commissioned": "1995-01-15"
+  },
+  {
+    "icao": "KCLX",
+    "name": "CHARLESTON",
+    "state": "SC",
+    "lat": 32.655528,
+    "lon": -81.042194,
+    "commissioned": "1996-03-20"
+  },
+  {
+    "icao": "KCRI",
+    "name": "ROC FAA REDUNDANT RDA 1",
+    "state": "OK",
+    "lat": 35.238333,
+    "lon": -97.46,
+    "commissioned": "2014-10-31"
+  },
+  {
+    "icao": "KCRP",
+    "name": "CORPUS CHRISTI",
+    "state": "TX",
+    "lat": 27.784017,
+    "lon": -97.51125,
+    "commissioned": "1996-06-30"
+  },
+  {
+    "icao": "KCXX",
+    "name": "BURLINGTON",
+    "state": "VT",
+    "lat": 44.511,
+    "lon": -73.166431,
+    "commissioned": "1995-01-13"
+  },
+  {
+    "icao": "KCYS",
+    "name": "CHEYENNE",
+    "state": "WY",
+    "lat": 41.151919,
+    "lon": -104.80603,
+    "commissioned": "1994-06-07"
+  },
+  {
+    "icao": "KDAX",
+    "name": "SACRAMENTO",
+    "state": "CA",
+    "lat": 38.501111,
+    "lon": -121.67783,
+    "commissioned": "1994-01-26"
+  },
+  {
+    "icao": "KDDC",
+    "name": "DODGE CITY",
+    "state": "KS",
+    "lat": 37.760833,
+    "lon": -99.968889,
+    "commissioned": "1992-09-29"
+  },
+  {
+    "icao": "KDFX",
+    "name": "LAUGHLIN AFB",
+    "state": "TX",
+    "lat": 29.273139,
+    "lon": -100.28033,
+    "commissioned": "1996-01-26"
+  },
+  {
+    "icao": "KDGX",
+    "name": "JACKSON BRANDON",
+    "state": "MS",
+    "lat": 32.279944,
+    "lon": -89.984444,
+    "commissioned": "2003-02-11"
+  },
+  {
+    "icao": "KDIX",
+    "name": "PHILADELPHIA",
+    "state": "NJ",
+    "lat": 39.947089,
+    "lon": -74.410731,
+    "commissioned": "1995-01-25"
+  },
+  {
+    "icao": "KDLH",
+    "name": "DULUTH",
+    "state": "MN",
+    "lat": 46.836944,
+    "lon": -92.209722,
+    "commissioned": "1995-10-05"
+  },
+  {
+    "icao": "KDMX",
+    "name": "DES MOINES",
+    "state": "IA",
+    "lat": 41.7312,
+    "lon": -93.722869,
+    "commissioned": "1993-03-13"
+  },
+  {
+    "icao": "KDOX",
+    "name": "DOVER AFB",
+    "state": "DE",
+    "lat": 38.825767,
+    "lon": -75.440117,
+    "commissioned": "1995-08-15"
+  },
+  {
+    "icao": "KDTX",
+    "name": "DETROIT",
+    "state": "MI",
+    "lat": 42.7,
+    "lon": -83.471667,
+    "commissioned": "1995-02-20"
+  },
+  {
+    "icao": "KDVN",
+    "name": "DAVENPORT",
+    "state": "IA",
+    "lat": 41.611667,
+    "lon": -90.580833,
+    "commissioned": "1995-01-09"
+  },
+  {
+    "icao": "KDYX",
+    "name": "DYESS AFB",
+    "state": "TX",
+    "lat": 32.5385,
+    "lon": -99.254333,
+    "commissioned": "1995-05-05"
+  },
+  {
+    "icao": "KEAX",
+    "name": "KANSAS CITY",
+    "state": "MO",
+    "lat": 38.81025,
+    "lon": -94.264472,
+    "commissioned": "1994-04-14"
+  },
+  {
+    "icao": "KEMX",
+    "name": "TUCSON",
+    "state": "AZ",
+    "lat": 31.89365,
+    "lon": -110.63025,
+    "commissioned": "1995-10-03"
+  },
+  {
+    "icao": "KENX",
+    "name": "ALBANY",
+    "state": "NY",
+    "lat": 42.586556,
+    "lon": -74.064083,
+    "commissioned": "1995-03-16"
+  },
+  {
+    "icao": "KEOX",
+    "name": "FORT RUCKER",
+    "state": "AL",
+    "lat": 31.460556,
+    "lon": -85.459389,
+    "commissioned": "1996-03-26"
+  },
+  {
+    "icao": "KEPZ",
+    "name": "EL PASO",
+    "state": "NM",
+    "lat": 31.873056,
+    "lon": -106.698,
+    "commissioned": "1996-05-15"
+  },
+  {
+    "icao": "KESX",
+    "name": "LAS VEGAS",
+    "state": "NV",
+    "lat": 35.70135,
+    "lon": -114.89165,
+    "commissioned": "1995-06-14"
+  },
+  {
+    "icao": "KEVX",
+    "name": "EGLIN AFB",
+    "state": "FL",
+    "lat": 30.565033,
+    "lon": -85.921667,
+    "commissioned": "1994-08-15"
+  },
+  {
+    "icao": "KEWX",
+    "name": "AUSTIN SAN ANTONIO",
+    "state": "TX",
+    "lat": 29.704056,
+    "lon": -98.028611,
+    "commissioned": "1995-03-20"
+  },
+  {
+    "icao": "KEYX",
+    "name": "EDWARDS",
+    "state": "CA",
+    "lat": 35.09785,
+    "lon": -117.56075,
+    "commissioned": "1995-08-21"
+  },
+  {
+    "icao": "KFCX",
+    "name": "ROANOKE",
+    "state": "VA",
+    "lat": 37.0244,
+    "lon": -80.273969,
+    "commissioned": "1995-02-13"
+  },
+  {
+    "icao": "KFDR",
+    "name": "ALTUS AFB",
+    "state": "OK",
+    "lat": 34.362194,
+    "lon": -98.976667,
+    "commissioned": "1992-02-15"
+  },
+  {
+    "icao": "KFDX",
+    "name": "CANNON AFB",
+    "state": "NM",
+    "lat": 34.634167,
+    "lon": -103.61888,
+    "commissioned": "1995-06-28"
+  },
+  {
+    "icao": "KFFC",
+    "name": "ATLANTA",
+    "state": "GA",
+    "lat": 33.36355,
+    "lon": -84.56595,
+    "commissioned": "1994-11-09"
+  },
+  {
+    "icao": "KFSD",
+    "name": "SIOUX FALLS",
+    "state": "SD",
+    "lat": 43.587778,
+    "lon": -96.729444,
+    "commissioned": "1993-12-07"
+  },
+  {
+    "icao": "KFSX",
+    "name": "FLAGSTAFF",
+    "state": "AZ",
+    "lat": 34.574333,
+    "lon": -111.19844,
+    "commissioned": "1996-01-07"
+  },
+  {
+    "icao": "KFTG",
+    "name": "DENVER FRONT RANGE AP",
+    "state": "CO",
+    "lat": 39.786639,
+    "lon": -104.5458,
+    "commissioned": "1993-06-19"
+  },
+  {
+    "icao": "KFWS",
+    "name": "DALLAS",
+    "state": "TX",
+    "lat": 32.573,
+    "lon": -97.30315,
+    "commissioned": "1994-03-23"
+  },
+  {
+    "icao": "KGGW",
+    "name": "GLASGOW",
+    "state": "MT",
+    "lat": 48.206361,
+    "lon": -106.62469,
+    "commissioned": "1996-02-01"
+  },
+  {
+    "icao": "KGJX",
+    "name": "GRAND JUNCTION",
+    "state": "CO",
+    "lat": 39.062169,
+    "lon": -108.21376,
+    "commissioned": "1996-02-01"
+  },
+  {
+    "icao": "KGLD",
+    "name": "GOODLAND",
+    "state": "KS",
+    "lat": 39.366944,
+    "lon": -101.70027,
+    "commissioned": "1992-12-13"
+  },
+  {
+    "icao": "KGRB",
+    "name": "GREEN BAY",
+    "state": "WI",
+    "lat": 44.498633,
+    "lon": -88.111111,
+    "commissioned": "1995-06-13"
+  },
+  {
+    "icao": "KGRK",
+    "name": "FORT HOOD",
+    "state": "TX",
+    "lat": 30.721833,
+    "lon": -97.382944,
+    "commissioned": "1995-04-21"
+  },
+  {
+    "icao": "KGRR",
+    "name": "GRAND RAPIDS",
+    "state": "MI",
+    "lat": 42.893889,
+    "lon": -85.544889,
+    "commissioned": "1995-09-21"
+  },
+  {
+    "icao": "KGSP",
+    "name": "GREER",
+    "state": "SC",
+    "lat": 34.883306,
+    "lon": -82.219833,
+    "commissioned": "1995-04-19"
+  },
+  {
+    "icao": "KGWX",
+    "name": "COLUMBUS AFB",
+    "state": "MS",
+    "lat": 33.896917,
+    "lon": -88.329194,
+    "commissioned": "1995-06-02"
+  },
+  {
+    "icao": "KGYX",
+    "name": "PORTLAND",
+    "state": "ME",
+    "lat": 43.891306,
+    "lon": -70.256361,
+    "commissioned": "1995-03-15"
+  },
+  {
+    "icao": "KHDC",
+    "name": "HAMMOND MUNICIPAL AIRPORT",
+    "state": "LA",
+    "lat": 30.5193,
+    "lon": -90.4074,
+    "commissioned": "2024-03-23"
+  },
+  {
+    "icao": "KHDX",
+    "name": "HOLLOMAN AFB",
+    "state": "NM",
+    "lat": 33.077,
+    "lon": -106.12003,
+    "commissioned": "1995-08-24"
+  },
+  {
+    "icao": "KHGX",
+    "name": "HOUSTON",
+    "state": "TX",
+    "lat": 29.4719,
+    "lon": -95.078733,
+    "commissioned": "1992-08-25"
+  },
+  {
+    "icao": "KHNX",
+    "name": "SAN JOAQUIN VALLEY",
+    "state": "CA",
+    "lat": 36.314181,
+    "lon": -119.63213,
+    "commissioned": "1995-03-21"
+  },
+  {
+    "icao": "KHPX",
+    "name": "FORT CAMPBELL",
+    "state": "KY",
+    "lat": 36.736972,
+    "lon": -87.285583,
+    "commissioned": "1995-09-05"
+  },
+  {
+    "icao": "KHTX",
+    "name": "HUNTSVILLE",
+    "state": "AL",
+    "lat": 34.930556,
+    "lon": -86.083611,
+    "commissioned": "1997-07-05"
+  },
+  {
+    "icao": "KICT",
+    "name": "WICHITA",
+    "state": "KS",
+    "lat": 37.654444,
+    "lon": -97.443056,
+    "commissioned": "1992-11-10"
+  },
+  {
+    "icao": "KICX",
+    "name": "CEDAR CITY",
+    "state": "UT",
+    "lat": 37.59105,
+    "lon": -112.86218,
+    "commissioned": "1996-10-16"
+  },
+  {
+    "icao": "KILN",
+    "name": "CINCINNATI",
+    "state": "OH",
+    "lat": 39.420483,
+    "lon": -83.8214,
+    "commissioned": "1995-05-17"
+  },
+  {
+    "icao": "KILX",
+    "name": "LINCOLN",
+    "state": "IL",
+    "lat": 40.1505,
+    "lon": -89.336792,
+    "commissioned": "1995-08-09"
+  },
+  {
+    "icao": "KIND",
+    "name": "INDIANAPOLIS",
+    "state": "IN",
+    "lat": 39.7075,
+    "lon": -86.280278,
+    "commissioned": "1994-08-05"
+  },
+  {
+    "icao": "KINX",
+    "name": "TULSA",
+    "state": "OK",
+    "lat": 36.175131,
+    "lon": -95.564161,
+    "commissioned": "1994-04-18"
+  },
+  {
+    "icao": "KIWA",
+    "name": "PHOENIX",
+    "state": "AZ",
+    "lat": 33.289233,
+    "lon": -111.66991,
+    "commissioned": "1993-06-30"
+  },
+  {
+    "icao": "KIWX",
+    "name": "FORT WAYNE",
+    "state": "IN",
+    "lat": 41.358611,
+    "lon": -85.7,
+    "commissioned": "1994-03-06"
+  },
+  {
+    "icao": "KJAX",
+    "name": "JACKSONVILLE",
+    "state": "FL",
+    "lat": 30.484633,
+    "lon": -81.7019,
+    "commissioned": "1995-02-10"
+  },
+  {
+    "icao": "KJGX",
+    "name": "ROBINS AFB",
+    "state": "GA",
+    "lat": 32.675683,
+    "lon": -83.350833,
+    "commissioned": "1994-08-16"
+  },
+  {
+    "icao": "KJKL",
+    "name": "JACKSON",
+    "state": "KY",
+    "lat": 37.590833,
+    "lon": -83.313056,
+    "commissioned": "1996-08-14"
+  },
+  {
+    "icao": "KLBB",
+    "name": "LUBBOCK",
+    "state": "TX",
+    "lat": 33.654139,
+    "lon": -101.81416,
+    "commissioned": "1994-04-01"
+  },
+  {
+    "icao": "KLCH",
+    "name": "LAKE CHARLES",
+    "state": "LA",
+    "lat": 30.125306,
+    "lon": -93.215889,
+    "commissioned": "1995-04-23"
+  },
+  {
+    "icao": "KLGX",
+    "name": "LANGLEY HILL NW WASHINGTON",
+    "state": "WA",
+    "lat": 47.116944,
+    "lon": -124.10666,
+    "commissioned": "2011-08-17"
+  },
+  {
+    "icao": "KLIX",
+    "name": "NEW ORLEANS",
+    "state": "LA",
+    "lat": 30.336667,
+    "lon": -89.825417
+  },
+  {
+    "icao": "KLNX",
+    "name": "NORTH PLATTE",
+    "state": "NE",
+    "lat": 41.957944,
+    "lon": -100.57622,
+    "commissioned": "1996-05-03"
+  },
+  {
+    "icao": "KLOT",
+    "name": "CHICAGO",
+    "state": "IL",
+    "lat": 41.604444,
+    "lon": -88.084444
+  },
+  {
+    "icao": "KLRX",
+    "name": "ELKO",
+    "state": "NV",
+    "lat": 40.73955,
+    "lon": -116.8027,
+    "commissioned": "1996-02-04"
+  },
+  {
+    "icao": "KLSX",
+    "name": "ST LOUIS",
+    "state": "MO",
+    "lat": 38.698611,
+    "lon": -90.682778,
+    "commissioned": "1994-04-17"
+  },
+  {
+    "icao": "KLTX",
+    "name": "WILMINGTON",
+    "state": "NC",
+    "lat": 33.98915,
+    "lon": -78.429108,
+    "commissioned": "1995-05-11"
+  },
+  {
+    "icao": "KLVX",
+    "name": "LOUISVILLE",
+    "state": "KY",
+    "lat": 37.975278,
+    "lon": -85.943889,
+    "commissioned": "1994-05-06"
+  },
+  {
+    "icao": "KLWX",
+    "name": "STERLING",
+    "state": "VA",
+    "lat": 38.976111,
+    "lon": -77.4875,
+    "commissioned": "1991-11-12"
+  },
+  {
+    "icao": "KLZK",
+    "name": "LITTLE ROCK",
+    "state": "AR",
+    "lat": 34.8365,
+    "lon": -92.262194,
+    "commissioned": "1994-04-12"
+  },
+  {
+    "icao": "KMAF",
+    "name": "MIDLAND ODESSA",
+    "state": "TX",
+    "lat": 31.943461,
+    "lon": -102.18925,
+    "commissioned": "1995-06-08"
+  },
+  {
+    "icao": "KMAX",
+    "name": "MEDFORD",
+    "state": "OR",
+    "lat": 42.081169,
+    "lon": -122.71736,
+    "commissioned": "1996-01-18"
+  },
+  {
+    "icao": "KMBX",
+    "name": "MINOT AFB",
+    "state": "ND",
+    "lat": 48.393056,
+    "lon": -100.86444,
+    "commissioned": "1995-07-24"
+  },
+  {
+    "icao": "KMHX",
+    "name": "MOREHEAD CITY",
+    "state": "NC",
+    "lat": 34.775908,
+    "lon": -76.876189,
+    "commissioned": "1994-06-17"
+  },
+  {
+    "icao": "KMKX",
+    "name": "MILWAUKEE",
+    "state": "WI",
+    "lat": 42.9679,
+    "lon": -88.550667,
+    "commissioned": "1995-04-27"
+  },
+  {
+    "icao": "KMLB",
+    "name": "MELBOURNE",
+    "state": "FL",
+    "lat": 28.113194,
+    "lon": -80.654083,
+    "commissioned": "1991-10-16"
+  },
+  {
+    "icao": "KMOB",
+    "name": "MOBILE",
+    "state": "AL",
+    "lat": 30.679444,
+    "lon": -88.24,
+    "commissioned": "1995-01-12"
+  },
+  {
+    "icao": "KMPX",
+    "name": "MINNEAPOLIS",
+    "state": "MN",
+    "lat": 44.848889,
+    "lon": -93.565528,
+    "commissioned": "1995-05-30"
+  },
+  {
+    "icao": "KMQT",
+    "name": "MARQUETTE",
+    "state": "MI",
+    "lat": 46.531111,
+    "lon": -87.548333,
+    "commissioned": "1995-10-16"
+  },
+  {
+    "icao": "KMRX",
+    "name": "KNOXVILLE",
+    "state": "TN",
+    "lat": 36.168611,
+    "lon": -83.401944,
+    "commissioned": "1995-11-29"
+  },
+  {
+    "icao": "KMSX",
+    "name": "MISSOULA",
+    "state": "MT",
+    "lat": 47.041,
+    "lon": -113.98622,
+    "commissioned": "1995-01-13"
+  },
+  {
+    "icao": "KMTX",
+    "name": "SALT LAKE CITY",
+    "state": "UT",
+    "lat": 41.262778,
+    "lon": -112.44777,
+    "commissioned": "1995-02-22"
+  },
+  {
+    "icao": "KMUX",
+    "name": "SAN FRANCISCO",
+    "state": "CA",
+    "lat": 37.155222,
+    "lon": -121.89844,
+    "commissioned": "1994-03-29"
+  },
+  {
+    "icao": "KMVX",
+    "name": "GRAND FORKS",
+    "state": "ND",
+    "lat": 47.527778,
+    "lon": -97.325556,
+    "commissioned": "1995-12-16"
+  },
+  {
+    "icao": "KMXX",
+    "name": "MAXWELL AFB",
+    "state": "AL",
+    "lat": 32.53665,
+    "lon": -85.78975,
+    "commissioned": "1995-10-27"
+  },
+  {
+    "icao": "KNKX",
+    "name": "SAN DIEGO",
+    "state": "CA",
+    "lat": 32.919017,
+    "lon": -117.0418,
+    "commissioned": "1996-04-30"
+  },
+  {
+    "icao": "KNQA",
+    "name": "MEMPHIS",
+    "state": "TN",
+    "lat": 35.344722,
+    "lon": -89.873333,
+    "commissioned": "1994-04-11"
+  },
+  {
+    "icao": "KOAX",
+    "name": "OMAHA",
+    "state": "NE",
+    "lat": 41.320369,
+    "lon": -96.366819,
+    "commissioned": "1995-04-18"
+  },
+  {
+    "icao": "KOHX",
+    "name": "NASHVILLE",
+    "state": "TN",
+    "lat": 36.247222,
+    "lon": -86.5625,
+    "commissioned": "1994-10-13"
+  },
+  {
+    "icao": "KOKX",
+    "name": "NEW YORK CITY",
+    "state": "NY",
+    "lat": 40.865528,
+    "lon": -72.863917,
+    "commissioned": "1993-09-13"
+  },
+  {
+    "icao": "KOTX",
+    "name": "SPOKANE",
+    "state": "WA",
+    "lat": 47.680417,
+    "lon": -117.62677,
+    "commissioned": "1996-04-10"
+  },
+  {
+    "icao": "KOUN",
+    "name": "NORMAN NSSL",
+    "state": "OK",
+    "lat": 35.236058,
+    "lon": -97.46235,
+    "commissioned": "2010-05-09"
+  },
+  {
+    "icao": "KPAH",
+    "name": "PADUCAH",
+    "state": "KY",
+    "lat": 37.068333,
+    "lon": -88.771944,
+    "commissioned": "1995-06-02"
+  },
+  {
+    "icao": "KPBZ",
+    "name": "PITTSBURGH",
+    "state": "PA",
+    "lat": 40.531717,
+    "lon": -80.217967,
+    "commissioned": "1994-08-04"
+  },
+  {
+    "icao": "KPDT",
+    "name": "PENDLETON",
+    "state": "OR",
+    "lat": 45.69065,
+    "lon": -118.85293,
+    "commissioned": "1996-04-20"
+  },
+  {
+    "icao": "KPOE",
+    "name": "FORT POLK",
+    "state": "LA",
+    "lat": 31.155278,
+    "lon": -92.976111,
+    "commissioned": "1995-06-28"
+  },
+  {
+    "icao": "KPUX",
+    "name": "PUEBLO",
+    "state": "CO",
+    "lat": 38.45955,
+    "lon": -104.18135,
+    "commissioned": "1995-06-13"
+  },
+  {
+    "icao": "KRAX",
+    "name": "RALEIGH DURHAM",
+    "state": "NC",
+    "lat": 35.665519,
+    "lon": -78.48975,
+    "commissioned": "1994-05-30"
+  },
+  {
+    "icao": "KRGX",
+    "name": "RENO",
+    "state": "NV",
+    "lat": 39.754056,
+    "lon": -119.46202,
+    "commissioned": "1995-02-24"
+  },
+  {
+    "icao": "KRIW",
+    "name": "RIVERTON",
+    "state": "WY",
+    "lat": 43.066089,
+    "lon": -108.4773,
+    "commissioned": "1995-10-02"
+  },
+  {
+    "icao": "KRLX",
+    "name": "CHARLESTON",
+    "state": "WV",
+    "lat": 38.311111,
+    "lon": -81.722778,
+    "commissioned": "1994-08-20"
+  },
+  {
+    "icao": "KRTX",
+    "name": "PORTLAND",
+    "state": "OR",
+    "lat": 45.715039,
+    "lon": -122.965,
+    "commissioned": "1995-03-13"
+  },
+  {
+    "icao": "KSFX",
+    "name": "POCATELLO",
+    "state": "ID",
+    "lat": 43.1056,
+    "lon": -112.68613,
+    "commissioned": "1995-09-27"
+  },
+  {
+    "icao": "KSGF",
+    "name": "SPRINGFIELD",
+    "state": "MO",
+    "lat": 37.235239,
+    "lon": -93.400419,
+    "commissioned": "1995-04-24"
+  },
+  {
+    "icao": "KSHV",
+    "name": "SHREVEPORT",
+    "state": "LA",
+    "lat": 32.450833,
+    "lon": -93.84125,
+    "commissioned": "1995-08-28"
+  },
+  {
+    "icao": "KSJT",
+    "name": "SAN ANGELO",
+    "state": "TX",
+    "lat": 31.371278,
+    "lon": -100.4925,
+    "commissioned": "1996-04-07"
+  },
+  {
+    "icao": "KSOX",
+    "name": "SANTA ANA MOUNTAINS",
+    "state": "CA",
+    "lat": 33.817733,
+    "lon": -117.636,
+    "commissioned": "1996-12-06"
+  },
+  {
+    "icao": "KSRX",
+    "name": "FORT SMITH",
+    "state": "AR",
+    "lat": 35.290417,
+    "lon": -94.361889,
+    "commissioned": "1997-02-10"
+  },
+  {
+    "icao": "KTBW",
+    "name": "TAMPA",
+    "state": "FL",
+    "lat": 27.7055,
+    "lon": -82.401778,
+    "commissioned": "1995-02-27"
+  },
+  {
+    "icao": "KTFX",
+    "name": "GREAT FALLS",
+    "state": "MT",
+    "lat": 47.459583,
+    "lon": -111.38533,
+    "commissioned": "1995-01-12"
+  },
+  {
+    "icao": "KTLH",
+    "name": "TALLAHASSEE",
+    "state": "FL",
+    "lat": 30.397583,
+    "lon": -84.328944,
+    "commissioned": "1995-06-16"
+  },
+  {
+    "icao": "KTLX",
+    "name": "OKLAHOMA CITY",
+    "state": "OK",
+    "lat": 35.333361,
+    "lon": -97.277761,
+    "commissioned": "1991-06-05"
+  },
+  {
+    "icao": "KTWX",
+    "name": "TOPEKA",
+    "state": "KS",
+    "lat": 38.99695,
+    "lon": -96.23255,
+    "commissioned": "1993-10-25"
+  },
+  {
+    "icao": "KTYX",
+    "name": "FORT DRUM",
+    "state": "NY",
+    "lat": 43.755694,
+    "lon": -75.679861,
+    "commissioned": "1998-06-10"
+  },
+  {
+    "icao": "KUDX",
+    "name": "RAPID CITY",
+    "state": "SD",
+    "lat": 44.124722,
+    "lon": -102.83,
+    "commissioned": "1996-01-20"
+  },
+  {
+    "icao": "KUEX",
+    "name": "HASTINGS",
+    "state": "NE",
+    "lat": 40.320833,
+    "lon": -98.441944,
+    "commissioned": "1994-10-27"
+  },
+  {
+    "icao": "KVAX",
+    "name": "MOODY AFB",
+    "state": "GA",
+    "lat": 30.890278,
+    "lon": -83.001806,
+    "commissioned": "1996-10-17"
+  },
+  {
+    "icao": "KVBX",
+    "name": "VANDENBERG AFB",
+    "state": "CA",
+    "lat": 34.83855,
+    "lon": -120.39791,
+    "commissioned": "1995-11-21"
+  },
+  {
+    "icao": "KVNX",
+    "name": "VANCE AFB",
+    "state": "OK",
+    "lat": 36.740617,
+    "lon": -98.127717,
+    "commissioned": "1994-11-22"
+  },
+  {
+    "icao": "KVTX",
+    "name": "LOS ANGELES",
+    "state": "CA",
+    "lat": 34.412017,
+    "lon": -119.17875,
+    "commissioned": "1994-08-16"
+  },
+  {
+    "icao": "KVWX",
+    "name": "EVANSVILLE",
+    "state": "IN",
+    "lat": 38.26025,
+    "lon": -87.724528,
+    "commissioned": "2003-01-29"
+  },
+  {
+    "icao": "KYUX",
+    "name": "YUMA",
+    "state": "AZ",
+    "lat": 32.495281,
+    "lon": -114.65671,
+    "commissioned": "1996-07-26"
+  }
+]

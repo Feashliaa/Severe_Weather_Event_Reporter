@@ -1,0 +1,119 @@
+body {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* TWC-style card with banner */
+.tv-card {
+    border: 3px solid #003a8c;
+    background: #003a8c;
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.15);
+}
+
+.tv-card-header {
+    background: linear-gradient(to bottom, #002766, #001f4d);
+    border-bottom: 2px solid #facc15;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+}
+
+.tv-header-tag {
+    background: #facc15;
+    color: #003a8c;
+    font-weight: 900;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    letter-spacing: 0.15em;
+    font-family: 'Oswald', sans-serif;
+}
+
+.tv-header-location {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    color: #facc15;
+}
+
+/* weather.gov style document card */
+.gov-card {
+    border: 2px solid #003a8c;
+    background: white;
+    box-shadow: 3px 3px 0 rgba(0, 58, 140, 0.15);
+}
+
+.gov-card-header {
+    background: #003a8c;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-bottom: 2px solid #facc15;
+}
+
+.gov-header-count {
+    background: #facc15;
+    color: #003a8c;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    font-weight: 900;
+}
+
+/* Override Tailwind's bg-red-700 with importance for the red warning header */
+.gov-card-header.bg-red-700\! {
+    background: #b91c1c !important;
+}
+
+.nav-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.65rem 0.85rem;
+    color: white;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+    white-space: nowrap;
+    transition: background 100ms ease, color 100ms ease;
+    flex-shrink: 0;
+}
+
+.nav-tab:hover {
+    background: #facc15;
+    color: #003a8c;
+}
+
+.nav-tab:first-child {
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Remove default marker on details */
+summary {
+    list-style: none;
+}
+
+summary::-webkit-details-marker {
+    display: none;
+}
+
+/* Rotate the chevron when open */
+details .collapse-marker {
+    display: inline-block;
+    transition: transform 150ms ease;
+}
+
+details:not([open]) .collapse-marker {
+    transform: rotate(-90deg);
+}

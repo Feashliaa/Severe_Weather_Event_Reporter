@@ -1,0 +1,35 @@
+{
+    "event_name": "Joplin Tornado",
+    "event_date": "May 22, 2011",
+    "location": "Joplin, Missouri",
+    "local_timezone": "America/Chicago",
+    "window_start_utc": "2011-05-22T22:00:00Z",
+    "window_end_utc": "2011-05-22T23:30:00Z",
+    "zoom_lat": 37.084,
+    "zoom_lon": -94.513,
+    "zoom_km": 60.0,
+    "max_radar_scans": 8,
+    "vtec_events": [
+        {
+            "wfo": "SGF",
+            "year": 2011,
+            "phenomena": "TO",
+            "significance": "W",
+            "etn": 30
+        },
+        {
+            "wfo": "SGF",
+            "year": 2011,
+            "phenomena": "TO",
+            "significance": "W",
+            "etn": 31
+        },
+        {
+            "wfo": "SGF",
+            "year": 2011,
+            "phenomena": "TO",
+            "significance": "W",
+            "etn": 32
+        }
+    ]
+}

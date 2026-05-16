@@ -1,0 +1,22 @@
+{
+    "event_name": "Greenfield Tornado",
+    "event_date": "May 21, 2024",
+    "location": "Greenfield, Iowa",
+    "local_timezone": "America/Chicago",
+    "radar_site": "KDMX",
+    "window_start_utc": "2024-05-21T19:30:00Z",
+    "window_end_utc": "2024-05-21T21:00:00Z",
+    "zoom_lat": 41.305,
+    "zoom_lon": -94.461,
+    "zoom_km": 60.0,
+    "max_radar_scans": 8,
+    "vtec_events": [
+        {
+            "wfo": "DMX",
+            "year": 2024,
+            "phenomena": "TO",
+            "significance": "W",
+            "etn": 49
+        }
+    ]
+}
