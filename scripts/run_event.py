@@ -27,6 +27,13 @@ def main():
         action="store_true",
         help="List all available event configs",
     )
+    
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerate report even if it already exists",
+    )
+    
     args = parser.parse_args()
 
     if args.list:
@@ -62,8 +69,9 @@ def main():
         local_timezone=cfg.local_timezone,
         auto_discover=cfg.auto_discover,
         discover_phenomena=cfg.discover_phenomena,
+        force=args.force,
     )
-    print(f"Done. Report: {output}")
+    print(f"Done. Report: {output / 'report_data.json'}")
 
 
 if __name__ == "__main__":

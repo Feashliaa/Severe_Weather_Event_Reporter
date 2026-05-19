@@ -9,7 +9,13 @@
     <section class="mb-4">
         <div class="border-2 border-amber-500 bg-amber-50 p-4">
             <div class="flex items-start gap-3">
-                <span class="text-amber-700 font-bold text-lg">⚠</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round" class="text-amber-700 inline">
+                    <path
+                        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
                 <div class="flex-1">
                     <p class="font-bold text-amber-900 uppercase tracking-wide text-sm mb-2"
                         style="font-family: 'Oswald', sans-serif;">
@@ -31,7 +37,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=VT323&family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="static/report.css">
+    <link rel="stylesheet" href="/static/report.css">
 </head>
 
 <body class="bg-[#deeefb] text-slate-900 min-h-screen">
@@ -45,7 +51,12 @@
                 <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter
                 </div>
             </div>
-            <div class="text-yellow-400 text-xs font-mono">{{ report.event_date }}</div>
+            <div class="flex items-center gap-4">
+                <span class="text-yellow-400 text-xs font-mono">{{ report.event_date }}</span>
+                <a href="/" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">New Report</a>
+                <a href="/gallery" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">Previous
+                    Reports</a>
+            </div>
         </div>
     </div>
 
@@ -54,11 +65,57 @@
     <nav class="sticky top-0 z-40 bg-[#003a8c] border-b-2 border-yellow-400 shadow-md">
         <div class="max-w-5xl mx-auto px-2 md:px-4">
             <div class="flex overflow-x-auto -mx-2 px-2">
-                <a href="#narrative" class="nav-tab">📋 NARRATIVE</a>
-                {% if report.radar_images %}<a href="#radar" class="nav-tab">📡 RADAR</a>{% endif %}
-                {% if report.radar_features %}<a href="#scans" class="nav-tab">📊 SCANS</a>{% endif %}
-                {% if report.warnings %}<a href="#warnings" class="nav-tab">⚠️ WARNINGS</a>{% endif %}
-                {% if report.lsrs %}<a href="#lsrs" class="nav-tab">📍 LSRS</a>{% endif %}
+                <a href="#narrative" class="nav-tab">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round"
+                        style="display:inline;vertical-align:middle;margin-right:5px">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    NARRATIVE
+                </a>
+                {% if report.radar_images %}<a href="#radar" class="nav-tab">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round"
+                        style="display:inline;vertical-align:middle;margin-right:5px">
+                        <circle cx="12" cy="12" r="2" />
+                        <path
+                            d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
+                    </svg>
+                    RADAR
+                </a>{% endif %}
+                {% if report.radar_features %}<a href="#scans" class="nav-tab">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round"
+                        style="display:inline;vertical-align:middle;margin-right:5px">
+                        <line x1="18" y1="20" x2="18" y2="10" />
+                        <line x1="12" y1="20" x2="12" y2="4" />
+                        <line x1="6" y1="20" x2="6" y2="14" />
+                    </svg>
+                    SCANS
+                </a>{% endif %}
+                {% if report.warnings %}<a href="#warnings" class="nav-tab">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round"
+                        style="display:inline;vertical-align:middle;margin-right:5px">
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    WARNINGS
+                </a>{% endif %}
+                {% if report.lsrs %}<a href="#lsrs" class="nav-tab">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round"
+                        style="display:inline;vertical-align:middle;margin-right:5px">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    LSRS
+                </a>{% endif %}
             </div>
         </div>
     </nav>
@@ -91,7 +148,10 @@
 
                 <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
                     <span>EVENT NARRATIVE</span>
-                    <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                    <svg class="collapse-marker text-yellow-400" width="16" height="16" viewBox="0 0 24 24"
+                        fill="currentColor">
+                        <polygon points="4,8 20,8 12,18" />
+                    </svg>
                 </summary>
 
                 <article
@@ -117,7 +177,10 @@
                     <span>RADAR LOOP</span>
                     <span class="flex items-center gap-2">
                         <span class="gov-header-count">{{ report.radar_images | length }} FRAMES</span>
-                        <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                        <svg class="collapse-marker text-yellow-400" width="16" height="16" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <polygon points="4,8 20,8 12,18" />
+                        </svg>
                     </span>
                 </summary>
                 <div class="p-5 md:p-7">
@@ -157,7 +220,7 @@
                         </div>
 
                         <figcaption class="px-3 py-1.5 text-xs text-slate-700 border-t border-slate-300 bg-slate-50">
-                            Base Reflectivity &amp; Velocity (0.5°) — Click image to view all frames
+                            Base Reflectivity & Velocity (0.5°) - Click image to view all frames
                         </figcaption>
                     </figure>
                 </div>
@@ -173,7 +236,10 @@
                     <span>VOLUME SCAN ANALYSIS</span>
                     <span class="flex items-center gap-2">
                         <span class="gov-header-count">{{ report.radar_features | length }} VOLUMES</span>
-                        <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                        <svg class="collapse-marker text-yellow-400" width="16" height="16" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <polygon points="4,8 20,8 12,18" />
+                        </svg>
                     </span>
                 </summary>
 
@@ -244,7 +310,10 @@
                     <span>ACTIVE WARNINGS</span>
                     <span class="flex items-center gap-2">
                         <span class="gov-header-count">{{ report.warnings | length }} ISSUED</span>
-                        <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                        <svg class="collapse-marker text-yellow-400" width="16" height="16" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <polygon points="4,8 20,8 12,18" />
+                        </svg>
                     </span>
                 </summary>
                 <div class="p-3 md:p-5 space-y-2">
@@ -278,7 +347,10 @@
                     <span>LOCAL STORM REPORTS</span>
                     <span class="flex items-center gap-2">
                         <span class="gov-header-count">{{ report.lsrs | length }} REPORTS</span>
-                        <span class="text-yellow-400 text-lg leading-none collapse-marker">▼</span>
+                        <svg class="collapse-marker text-yellow-400" width="16" height="16" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <polygon points="4,8 20,8 12,18" />
+                        </svg>
                     </span>
                 </summary>
                 <div class="p-3 md:p-5 space-y-2">
@@ -300,7 +372,7 @@
                                 {% endif %}
                                 {% if lsr.magnitude %}<span class="font-mono font-bold text-slate-900">{{ lsr.magnitude
                                     }}</span>{% endif %}
-                                {% if lsr.city %}<span class="text-sm text-slate-700">&mdash; {{ lsr.city }}</span>{%
+                                {% if lsr.city %}<span class="text-sm text-slate-700">{{ lsr.city }}</span>{%
                                 endif
                                 %}
                             </div>
@@ -327,17 +399,34 @@
     <!-- Lightbox -->
     <div id="lightbox" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/95 p-4 cursor-zoom-out"
         role="dialog" aria-modal="true" aria-label="Image viewer">
+        <!-- Close -->
         <button type="button" id="lightbox-close"
-            class="absolute top-4 right-4 text-yellow-400 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center bg-[#003a8c] border-2 border-yellow-400 z-10"
-            aria-label="Close">&times;</button>
-        <button type="button" id="lightbox-prev"
-            class="absolute left-4 top-1/2 -translate-y-1/2 text-yellow-400 hover:text-white text-3xl leading-none w-12 h-12 items-center justify-center bg-[#003a8c] border-2 border-yellow-400 hidden"
-            aria-label="Previous frame">
-            &#9664;
+            class="absolute top-4 right-4 text-yellow-400 hover:text-white w-10 h-10 flex items-center justify-center bg-[#003a8c] border-2 border-yellow-400 z-10"
+            aria-label="Close">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
         </button>
+
+        <!-- Prev -->
+        <button type="button" id="lightbox-prev"
+            class="absolute left-4 top-1/2 -translate-y-1/2 text-yellow-400 hover:text-white w-12 h-12 items-center justify-center bg-[#003a8c] border-2 border-yellow-400 hidden"
+            aria-label="Previous frame">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="16,4 8,12 16,20" />
+            </svg>
+        </button>
+
+        <!-- Next -->
         <button type="button" id="lightbox-next"
-            class="absolute right-4 top-1/2 -translate-y-1/2 text-yellow-400 hover:text-white text-3xl leading-none w-12 h-12 items-center justify-center bg-[#003a8c] border-2 border-yellow-400 hidden"
-            aria-label="Next frame">&#9654;</button>
+            class="absolute right-4 top-1/2 -translate-y-1/2 text-yellow-400 hover:text-white w-12 h-12 items-center justify-center bg-[#003a8c] border-2 border-yellow-400 hidden"
+            aria-label="Next frame">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="8,4 16,12 8,20" />
+            </svg>
+        </button>
         <figure class="max-w-7xl max-h-full flex flex-col items-center gap-3">
             <img id="lightbox-img" src="" alt=""
                 class="max-w-full max-h-[85vh] object-contain shadow-2xl bg-white border-4 border-yellow-400">
@@ -345,8 +434,8 @@
         </figure>
     </div>
 
-    <script src="static/lightbox.js"></script>
-    <script src="static/radar-loop.js"></script>
+    <script src="/static/lightbox.js"></script>
+    <script src="/static/radar-loop.js"></script>
 </body>
 
 </html>

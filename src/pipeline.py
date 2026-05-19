@@ -1,17 +1,21 @@
 """End-to-end pipeline: event params in, HTML report out."""
 import math
+import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src import config
 from src.data_sources import iem, nexrad
 from src.radar import processor as radar_processor
 from src.radar import renderer as radar_renderer
-from src.report.builder import EventReport, build_html, generate_narrative
+from src.report.builder import EventReport, generate_narrative, build_html_string
 from src.data_sources import discovery, geocoding, radar_locator
 from src.models import VTECEventRef
 from src.feature_gates import feature_availability
+
+from shapely.geometry import Point, shape
+from shapely.ops import unary_union
 
 
 def run_pipeline(
@@ -31,8 +35,22 @@ def run_pipeline(
     auto_discover: bool = False,
     discover_phenomena: tuple[str, ...] = ("TO", "SV"),
     output_path: Path | None = None,
-) -> Path:
+    force: bool = False,
+) -> Path: # Returns path to generated report directory
     """Run the full pipeline for one event."""
+    
+    slug = event_name.lower().replace(" ", "_")
+    event_output_dir = config.OUTPUT_DIR / slug
+    existing = event_output_dir / "index.html"
+
+    if existing.exists() and not force:
+        print(f"  Report already exists: {existing}")
+        print(f"  Use force=True to regenerate.")
+        return existing
+
+    event_output_dir.mkdir(parents=True, exist_ok=True)
+    
+    
     report = EventReport(
         event_name=event_name,
         event_date=event_date,
@@ -48,9 +66,7 @@ def run_pipeline(
         zoom_lat, zoom_lon = geo.lat, geo.lon
         print(f"    => {zoom_lat:.3f}, {zoom_lon:.3f} ({geo.display_name})")
         
-    slug = event_name.lower().replace(" ", "_")
-    event_output_dir = config.OUTPUT_DIR / slug
-    event_output_dir.mkdir(parents=True, exist_ok=True)
+        
     images_dir = event_output_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
     
@@ -69,6 +85,11 @@ def run_pipeline(
             if s["icao"] == radar_site:
                 radar_commissioned = s.get("commissioned")
                 break
+    
+    # After selecting radar_site, get its actual coords
+    station = radar_locator.get_station(radar_site)
+    radar_site_lat = station.lat if station else None
+    radar_site_lon = station.lon if station else None
             
     # Step 0b: Gate features based on event date and radar
     print(f"Checking feature availability for {start.date()} ... ")
@@ -113,7 +134,6 @@ def run_pipeline(
         deg_per_km_lon = 1 / (111.0 * abs(math.cos(math.radians(zoom_lat))))
         lat_pad = lsr_search_km * deg_per_km_lat
         lon_pad = lsr_search_km * deg_per_km_lon
-
         lsr_start = start - timedelta(hours=1)
         lsr_end = end + timedelta(hours=6)
         sts = lsr_start.strftime("%Y-%m-%dT%H:%MZ")
@@ -136,6 +156,26 @@ def run_pipeline(
             if key not in seen_lsrs:
                 seen_lsrs.add(key)
                 report.lsrs.append(lsr)
+             
+        # Filter LSRS to just the warning polygons if available and relevant
+        if report.warnings and report.lsrs:
+            warning_polys = []
+            for w in report.warnings:
+                if w.get("polygon"):
+                    try:
+                        warning_polys.append(shape(w["polygon"]))
+                    except Exception:
+                        pass # ignore malformed polygons
+            
+            if warning_polys:
+                coverage = unary_union(warning_polys)
+                before = len(report.lsrs)
+                report.lsrs = [
+                    lsr for lsr in report.lsrs
+                    if lsr.get("lat") and lsr.get("lon")
+                    and coverage.contains(Point(lsr["lon"], lsr["lat"]))
+                ]
+                print(f"    Filtered LSRs to {len(report.lsrs)} that fall within warning polygons")
     elif zoom_lat is not None and zoom_lon is not None:
         print(" Skipping LSR fetch as data is not reliably archived for this time period")
         
@@ -164,6 +204,8 @@ def run_pipeline(
                     center_lat=zoom_lat,
                     center_lon=zoom_lon,
                     zoom_km=zoom_km,
+                    radar_site_lat=radar_site_lat,
+                    radar_site_lon=radar_site_lon,
                 )
                 report.radar_images.append(f"images/{img_path.name}")
                 print(f"      => rendered {img_path.name}")
@@ -177,6 +219,34 @@ def run_pipeline(
 
     if output_path is None:
         output_path = event_output_dir / "index.html"
+        
+    manifest = {
+        "slug": slug, 
+        "event_name": event_name,
+        "location": location,
+        "event_date": event_date,
+        "radar_site": radar_site,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    manifest_path = event_output_dir / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    
+    # Save structured report data for future re-rendering
+    report_data = {
+        "event_name": report.event_name,
+        "event_date": report.event_date,
+        "location": location,
+        "radar_site": radar_site,
+        "local_timezone": local_timezone,
+        "narrative": report.narrative,
+        "warnings": report.warnings,
+        "lsrs": report.lsrs,
+        "radar_features": report.radar_features,
+        "radar_images": report.radar_images,
+        "feature_notes": report.feature_notes,
+    }
+    report_data_path = event_output_dir / "report_data.json"
+    report_data_path.write_text(json.dumps(report_data, indent=2, default=str))
 
-    build_html(report, output_path, local_timezone=local_timezone)
-    return output_path
+    return event_output_dir

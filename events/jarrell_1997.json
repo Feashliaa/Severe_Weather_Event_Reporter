@@ -3,10 +3,10 @@
     "event_date": "May 27, 1997",
     "location": "Jarrell, Texas",
     "local_timezone": "America/Chicago",
-    "radar_site": "KGRK",
+    "radar_site": "KEWX",
     "window_start_utc": "1997-05-27T20:15:00Z",
     "window_end_utc": "1997-05-27T21:15:00Z",
-    "zoom_km": 80.0,
+    "zoom_km": 130.0,
     "lsr_search_km": 200.0,
     "max_radar_scans": 8,
     "discover": {

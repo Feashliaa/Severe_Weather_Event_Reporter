@@ -8,7 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-    <!-- Leaflet (loaded but map not initialized yet — we use the geosearch control standalone) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@4.0.0/dist/geosearch.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -18,14 +17,24 @@
 <body class="bg-[#deeefb] text-slate-900 min-h-screen">
 
     <div class="bg-[#003a8c] border-b-4 border-yellow-400">
-        <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
-            <div class="bg-yellow-400 text-[#003a8c] font-black px-3 py-1 text-xs tracking-widest"
-                style="font-family: 'Oswald', sans-serif;">SWX</div>
-            <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter</div>
+        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-yellow-400 text-[#003a8c] font-black px-3 py-1 text-xs tracking-widest"
+                    style="font-family: 'Oswald', sans-serif;">SWX</div>
+                <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="/"
+                    class="text-yellow-400 text-xs uppercase tracking-widest font-bold border-b-2 border-yellow-400">New
+                    Report</a>
+                <a href="/gallery" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">Previous
+                    Reports</a>
+            </div>
         </div>
     </div>
 
-    <div class="max-w-3xl mx-auto px-4 py-8">
+    <div class="max-w-5xl mx-auto px-4 py-8">
         <div class="bg-white border-2 border-[#003a8c] shadow-[3px_3px_0_rgba(0,58,140,0.15)]">
             <div class="bg-[#003a8c] text-white px-4 py-2 border-b-2 border-yellow-400 flex justify-between items-center"
                 style="font-family: 'Oswald', sans-serif;">
@@ -53,8 +62,9 @@
 
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-1">Date</label>
-                    <input name="date" type="date" required
+                    <input name="date" type="date" required min="1991-06-01"
                         class="w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none">
+                    <p class="text-xs text-slate-500 mt-1">Supported from June 1991 onwards (NEXRAD archive start).</p>
                 </div>
 
                 <div>
@@ -94,7 +104,13 @@
                     <button type="submit" id="submit-btn"
                         class="w-full bg-[#003a8c] text-yellow-400 font-bold uppercase tracking-widest px-4 py-3 hover:bg-yellow-400 hover:text-[#003a8c] transition-colors border-2 border-[#003a8c]"
                         style="font-family: 'Oswald', sans-serif;">
-                        ▶ Generate Report
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            style="display:inline;vertical-align:middle;margin-right:6px">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        Generate Report
                     </button>
                 </div>
             </form>

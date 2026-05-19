@@ -40,20 +40,18 @@
         showFrame((currentFrame + 1) % frames.length);
     }
 
-    const ICON_PAUSE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:inline;vertical-align:middle;margin-right:6px"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>PAUSE`;
-    const ICON_PLAY = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:inline;vertical-align:middle;margin-right:6px"><polygon points="5,3 19,12 5,21"/></svg>PLAY`;
-
     function startLoop() {
         if (timerId) clearInterval(timerId);
         timerId = setInterval(advance, intervalMs);
         playing = true;
-        playPause.innerHTML = ICON_PAUSE;
+        playPause.textContent = "⏸ PAUSE";
     }
+
     function stopLoop() {
         if (timerId) clearInterval(timerId);
         timerId = null;
         playing = false;
-        playPause.innerHTML = ICON_PLAY;
+        playPause.textContent = "▶ PLAY";
     }
 
     playPause.addEventListener("click", () => {

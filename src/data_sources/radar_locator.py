@@ -10,6 +10,8 @@ from pathlib import Path
 STATIONS_PATH = Path(__file__).parent / "nexrad_stations.json"
 
 
+EXCLUDED_ICAOS = {"KCRI", "KOUN"} 
+
 @dataclass
 class NexradStation:
     icao: str
@@ -49,6 +51,8 @@ def find_nearest_radar(lat: float, lon: float, max_distance_km: float = 230.0) -
     closest: tuple[float, dict] | None = None
 
     for s in stations:
+        if s["icao"] in EXCLUDED_ICAOS:
+            continue
         d = _haversine_km(lat, lon, s["lat"], s["lon"])
         if d <= max_distance_km and (closest is None or d < closest[0]):
             closest = (d, s)

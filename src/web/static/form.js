@@ -16,7 +16,7 @@ const resolvedHint = document.getElementById('location-resolved');
 // Build a minimal text input + dropdown manually (we're not using a map yet)
 const searchInput = document.createElement('input');
 searchInput.type = 'text';
-searchInput.placeholder = 'e.g., Bogue Chitto, Mississippi';
+searchInput.placeholder = 'e.g., Joplin, Missouri';
 searchInput.required = true;
 searchInput.autocomplete = 'off';
 searchInput.className = 'w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none';
@@ -107,15 +107,17 @@ document.querySelectorAll('input[name="tz_mode"]').forEach(radio => {
     });
 });
 
+const ICON_GENERATING = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:6px;animation:spin 1s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Generating...`;
+const ICON_SUBMIT = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:6px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Generate Report`;
+const ICON_RUNNING = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:inline;vertical-align:middle;margin-right:6px"><polygon points="5,3 19,12 5,21"/></svg>Submitting request and running pipeline. This may take 1-3 minutes...`;
+
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form));
-
     submitBtn.disabled = true;
-    submitBtn.textContent = '⏳ Generating...';
+    submitBtn.innerHTML = ICON_GENERATING;
     statusDiv.classList.remove('hidden');
-    statusText.textContent = '▶ Submitting request and running pipeline. This may take 1-3 minutes...';
-
+    statusText.innerHTML = ICON_RUNNING;
     try {
         const res = await fetch('/reports', {
             method: 'POST',
@@ -131,11 +133,11 @@ form.addEventListener('submit', async (e) => {
             const err = await res.json();
             statusText.textContent = 'Error: ' + (err.detail || 'unknown');
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Generate Report';
+            submitBtn.innerHTML = ICON_SUBMIT;
         }
     } catch (err) {
         statusText.textContent = 'Network error: ' + err.message;
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Generate Report';
+        submitBtn.innerHTML = ICON_SUBMIT;
     }
 });

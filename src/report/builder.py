@@ -111,17 +111,9 @@ def _format_time_with_local_tz(iso_str: str, local_tz: str) -> str:
         return iso_str  # Return raw string if parsing fails
         
 
-
-def build_html(report: EventReport, output_path: Path, local_timezone: str = "UTC") -> Path:
+def build_html_string(report: EventReport, local_timezone: str = "UTC") -> str:
+    """Render the report to an HTML string without writing to disk."""
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=True)
     env.filters["fmt_time"] = lambda s: _format_time_with_local_tz(s, local_timezone)
     template = env.get_template("report.html")
-    html = template.render(report=report)
-    output_path.write_text(html, encoding="utf-8")
-
-    static_dest = output_path.parent / "static"
-    if static_dest.exists():
-        shutil.rmtree(static_dest)
-    shutil.copytree(STATIC_DIR, static_dest)
-
-    return output_path
+    return template.render(report=report)

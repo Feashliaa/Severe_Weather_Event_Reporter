@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Gallery - Severe Weather Event Reporter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="bg-[#deeefb] text-slate-900 min-h-screen">
+
+    <div class="bg-[#003a8c] border-b-4 border-yellow-400">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-yellow-400 text-[#003a8c] font-black px-3 py-1 text-xs tracking-widest"
+                    style="font-family: 'Oswald', sans-serif;">SWX</div>
+                <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="/" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">New Report</a>
+                <a href="/gallery"
+                    class="text-yellow-400 text-xs uppercase tracking-widest font-bold border-b-2 border-yellow-400">Previous
+                    Reports</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto px-4 py-8">
+        <div class="bg-[#003a8c] text-white px-4 py-2 border-b-2 border-yellow-400 mb-4"
+            style="font-family: 'Oswald', sans-serif;">
+            <span class="font-bold uppercase tracking-wider text-sm">Generated Reports</span>
+            <span class="ml-2 text-yellow-400 text-xs">({{ reports | length }} total)</span>
+        </div>
+
+        {% if reports %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for r in reports %}
+            <a href="/reports/{{ r.slug }}/"
+                class="block bg-white border-2 border-[#003a8c] shadow-[3px_3px_0_rgba(0,58,140,0.15)] hover:border-yellow-400 hover:shadow-[3px_3px_0_rgba(250,204,21,0.4)] transition-all">
+                <div class="bg-[#003a8c] px-4 py-2 border-b-2 border-yellow-400 flex justify-between items-center">
+                    <span class="text-yellow-400 text-xs font-bold uppercase tracking-wider font-['Oswald']">
+                        {{ r.radar_site or "—" }}
+                    </span>
+                    <span class="text-white text-xs font-mono opacity-70">
+                        {{ r.generated_at[:10] }}
+                    </span>
+                </div>
+                <div class="p-4">
+                    <h2 class="text-lg font-bold text-[#003a8c] uppercase tracking-tight"
+                        style="font-family: 'Oswald', sans-serif;">
+                        {{ r.event_name }}
+                    </h2>
+                    <p class="text-sm text-slate-600 mt-1">{{ r.event_date }}</p>
+                    <p class="text-xs text-slate-500 mt-1">{{ r.location }}</p>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="bg-white border-2 border-slate-300 p-12 text-center">
+            <p class="text-slate-500 text-sm uppercase tracking-wider">No reports generated yet.</p>
+            <a href="/"
+                class="inline-block mt-4 bg-[#003a8c] text-yellow-400 font-bold uppercase tracking-widest px-4 py-2 text-xs hover:bg-yellow-400 hover:text-[#003a8c] transition-colors"
+                style="font-family: 'Oswald', sans-serif;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    style="display:inline;vertical-align:middle;margin-right:6px">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                </svg>
+                Generate Report
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+</body>
+
+</html>

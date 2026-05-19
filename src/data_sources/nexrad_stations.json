@@ -684,7 +684,8 @@
     "name": "NEW ORLEANS",
     "state": "LA",
     "lat": 30.336667,
-    "lon": -89.825417
+    "lon": -89.825417,
+    "commissioned": "1995-08-28"
   },
   {
     "icao": "KLNX",
@@ -699,7 +700,8 @@
     "name": "CHICAGO",
     "state": "IL",
     "lat": 41.604444,
-    "lon": -88.084444
+    "lon": -88.084444,
+    "commissioned": "1993-08-16"
   },
   {
     "icao": "KLRX",

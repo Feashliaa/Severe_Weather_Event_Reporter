@@ -1,32 +1,32 @@
 """FastAPI app for the Severe Weather Event Reporter."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as date_type
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.data_sources import geocoding
 from src.pipeline import run_pipeline
-
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from src.report.builder import EventReport, build_html_string
 
 from src import config
 
+import json
+
 app = FastAPI(title="Severe Weather Event Reporter")
+
+NEXRAD_START = date_type(1991, 6, 1)
 
 # Serve the output directory under /reports
 # This makes /reports/<slug>/static/* and /reports/<slug>/images/* work for free.
 WEB_STATIC_DIR = Path(__file__).parent / "static"
-app.mount("/reports", StaticFiles(directory=str(config.OUTPUT_DIR), html=True), name="reports")
-app.mount("/static", StaticFiles(directory=str(WEB_STATIC_DIR)), name="static")
-
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
+app.mount("/static", StaticFiles(directory=str(WEB_STATIC_DIR)), name="static")
 
 class ReportRequest(BaseModel):
     event_name: str
@@ -56,6 +56,8 @@ async def create_report(req: ReportRequest):
         event_date = datetime.strptime(req.date, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(400, f"Invalid date format: {req.date} (expected YYYY-MM-DD)")
+    if event_date < NEXRAD_START:
+        raise HTTPException(400, f"Events before {NEXRAD_START} are not supported. NEXRAD archive begins June 1991.")
 
     start_str = req.start_time or "18:00"
     end_str = req.end_time or "06:00"
@@ -107,8 +109,59 @@ async def create_report(req: ReportRequest):
             zoom_lat=lat,
             zoom_lon=lon,
             local_timezone=tz_name,
+            force=False,
         )
     except Exception as e:
         raise HTTPException(500, f"Pipeline failed: {e}")
 
     return RedirectResponse(url=f"/reports/{slug}/", status_code=303)
+
+@app.get("/gallery")
+async def gallery(request: Request):
+    reports = []
+    if config.OUTPUT_DIR.exists():
+        for manifest_path in sorted(
+            config.OUTPUT_DIR.glob("*/manifest.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        ):
+            try:
+                data = json.loads(manifest_path.read_text())
+                reports.append(data)
+            except (json.JSONDecodeError, OSError):
+                continue
+    return templates.TemplateResponse(request, "gallery.html", {"reports": reports})
+
+
+@app.get("/reports/{slug}/")
+async def view_report(slug: str):
+    data_path = config.OUTPUT_DIR / slug / "report_data.json"
+    if not data_path.exists():
+        raise HTTPException(404, f"Report not found: {slug}")
+    
+    try:
+        data = json.loads(data_path.read_text())
+        report = EventReport(
+        event_name=data["event_name"],
+        event_date=data["event_date"],
+        location=data["location"],
+        narrative=data.get("narrative", ""),
+        warnings=data.get("warnings", []),
+        lsrs=data.get("lsrs", []),
+        radar_features=data.get("radar_features", []),
+        radar_images=data.get("radar_images", []),
+        feature_notes=data.get("feature_notes", []),
+    )
+
+        html = build_html_string(report, local_timezone=data.get("local_timezone", "UTC"))
+        return HTMLResponse(html)
+    except (json.JSONDecodeError, KeyError) as e:
+        raise HTTPException(500, f"Error loading report data: {e}")
+    
+    
+@app.get("/reports/{slug}/images/{filename}")
+async def report_image(slug: str, filename: str):
+    img_path = config.OUTPUT_DIR / slug / "images" / filename
+    if not img_path.exists():
+        raise HTTPException(404)
+    return FileResponse(img_path)
