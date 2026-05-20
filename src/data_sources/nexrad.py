@@ -48,9 +48,6 @@ def pick_key_scans(
     max_scans: int = 5,
 ) -> list[Any]:
     """Down-select a long list of scans to a manageable subset for the report.
-
-    For v0 we just space them evenly across the time window. Later we can be
-    smarter — pick scans near LSR timestamps, peak reflectivity, etc.
     """
     if len(scans) <= max_scans:
         return scans

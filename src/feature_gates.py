@@ -7,9 +7,11 @@ so that it can either run, or skip each step in a more graceful way.
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
-SWB_POLYGONS_DEPLOYED = date(2007, 10, 1)
+SBW_POLYGONS_DEPLOYED = date(2007, 10, 1)
 DUAL_POL_DEPLOYED = date(2013, 4, 1)
 IEM_LSR_RELIABLE = date(2002, 1, 1)
+VTEC_WARNINGS_START = date(1996, 1, 1)
+
 
 
 
@@ -18,7 +20,8 @@ class FeatureAvailability:
     """ What data products are available for a given event data and radar """
     radar: bool = False
     radar_dual_pol: bool = False
-    swb_polygons: bool = False
+    sbw_polygons: bool = False
+    vtec_warnings: bool = False
     iem_lsr: bool = False
     notes: list[str] = field(default_factory=list)
     
@@ -53,6 +56,13 @@ def feature_availability(
             "radar data unavailable for this site."
         )
         
+    if event_date >= VTEC_WARNINGS_START:
+        avail.vtec_warnings = True
+    else:
+        avail.notes.append(
+            f"Event predates IEM VTEC archive ({VTEC_WARNINGS_START}); warning data unavailable."
+        )
+        
     # Check for dual-pol availability
     if event_date >= DUAL_POL_DEPLOYED:
         avail.radar_dual_pol = True
@@ -62,12 +72,12 @@ def feature_availability(
             "CC/ZDR products not available."
         )
         
-    # Check for SWB polygon availability
-    if event_date >= SWB_POLYGONS_DEPLOYED:
-        avail.swb_polygons = True
+    # Check for SBW polygon availability
+    if event_date >= SBW_POLYGONS_DEPLOYED:
+        avail.sbw_polygons = True
     else:
         avail.notes.append(
-            f"Event predates Storm-Based Warning polygons ({SWB_POLYGONS_DEPLOYED.isoformat()}); "
+            f"Event predates Storm-Based Warning polygons ({SBW_POLYGONS_DEPLOYED.isoformat()}); "
             "warning polygons may be less accurate."
         )
         

@@ -209,7 +209,7 @@ def render_radar_panel(
         name="admin_2_counties",
         scale="10m",
         facecolor="none",
-        edgecolor="red",
+        edgecolor="grey",
         linewidth=0.5,
     )
     states = cfeature.NaturalEarthFeature(
@@ -240,8 +240,8 @@ def render_radar_panel(
                     extent[2] < city_lat < extent[3]):
                 pop = city.attributes.get("POP_MAX", 0)
                 name = city.attributes.get("NAME", "")
-                # Only label places with population > 5000
-                if pop > 5000: # type: ignore
+                # Only label places with population > 1000
+                if pop > 1000: # type: ignore
                     ax.plot(city_lon, city_lat, "k.", markersize=5,
                     transform=ccrs.PlateCarree(), zorder=5)
                     ax.text(

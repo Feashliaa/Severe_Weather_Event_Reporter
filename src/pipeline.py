@@ -70,17 +70,35 @@ def run_pipeline(
     images_dir = event_output_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
     
-    # Step 0a: auto-select radar if not provided
+    # Auto-scale radar scans based on window length if user left default
+    if max_radar_scans == 8:
+        window_hours = (end - start).total_seconds() / 3600
+        max_radar_scans = max(8, min(16, int(window_hours * 5)))
+        if max_radar_scans > 8:
+            print(f"  Auto-scaled radar scans to {max_radar_scans} for {window_hours:.1f}h window")
+    
+    # Step 0a: auto-select radar with S3 data availability fallback
     if radar_site is None:
         print(f"  Finding nearest NEXRAD to ({zoom_lat:.3f}, {zoom_lon:.3f})...")
-        nearest = radar_locator.find_nearest_radar(zoom_lat, zoom_lon)
-        if nearest is None:
-            raise ValueError(f"No NEXRAD site within range of ({zoom_lat}, {zoom_lon})")
-        radar_site = nearest.icao
-        radar_commissioned = nearest.commissioned
-        print(f"    => {radar_site}: {nearest.name} ({nearest.distance_km}km)")
+        candidates = radar_locator.find_radars_within(zoom_lat, zoom_lon, radius_km=230.0)
+        candidates = [c for c in candidates if c.icao not in radar_locator.EXCLUDED_ICAOS]
+
+        radar_site = None
+        radar_commissioned = None
+        for candidate in candidates:
+            test_scans = nexrad.list_scans(candidate.icao, start, end)
+            if test_scans:
+                radar_site = candidate.icao
+                radar_commissioned = candidate.commissioned
+                print(f"    => {radar_site}: {candidate.name} ({candidate.distance_km}km) - {len(test_scans)} scans found")
+                break
+            else:
+                print(f"    Skipping {candidate.icao} ({candidate.name}, {candidate.distance_km}km) - no scans on S3")
+
+        if radar_site is None:
+            raise ValueError(f"No NEXRAD data found within 230km of ({zoom_lat:.3f}, {zoom_lon:.3f}) for {start.date()}")
     else:
-        radar_commissioned = None  # unknown
+        radar_commissioned = None
         for s in radar_locator._load_stations():
             if s["icao"] == radar_site:
                 radar_commissioned = s.get("commissioned")
@@ -101,7 +119,7 @@ def run_pipeline(
             
     # Step 0c: auto discover warnings
     if auto_discover and not vtec_events:
-        if avail.swb_polygons:
+        if avail.vtec_warnings:
             print(f"  Discovering warnings at ({zoom_lat:.3f}, {zoom_lon:.3f})...")
             vtec_events = discovery.discover_events(
                 lat=zoom_lat,
@@ -110,6 +128,8 @@ def run_pipeline(
                 end=end,
                 phenomena=discover_phenomena,
             )
+            if not avail.sbw_polygons:
+                print("  Note: pre-2007 warnings lack polygon geometry; LSR polygon filtering skipped")
             print(f"   => Found {len(vtec_events)} matching events")
         else:
             print("  Skipping warning auto-discovery (predates polygon warnings)")
@@ -158,7 +178,7 @@ def run_pipeline(
                 report.lsrs.append(lsr)
              
         # Filter LSRS to just the warning polygons if available and relevant
-        if report.warnings and report.lsrs:
+        if report.warnings and report.lsrs and avail.sbw_polygons:
             warning_polys = []
             for w in report.warnings:
                 if w.get("polygon"):

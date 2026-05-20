@@ -53,6 +53,9 @@ def discover_events(
 
     results: list[VTECEventRef] = []
     for event in raw.get("events", []):
+        
+        print(f"  Window: {start} to {end}")
+        
         print(f"  Checking: {event.get('phenomena')}.{event.get('significance')}.{event.get('eventid')} issued {event.get('issue')}")
         if event.get("phenomena") not in pheno_set:
             print(f"    skipped: phenomena {event.get('phenomena')} not in {pheno_set}")

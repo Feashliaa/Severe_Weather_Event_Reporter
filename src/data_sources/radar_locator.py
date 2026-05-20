@@ -71,6 +71,24 @@ def find_nearest_radar(lat: float, lon: float, max_distance_km: float = 230.0) -
         distance_km=round(d, 1),
     )
     
+def find_radars_within(lat: float, lon: float, radius_km: float = 230.0) -> list[NexradStation]:
+    """Return all NEXRAD sites within radius_km, sorted by distance."""
+    stations = _load_stations()
+    matches = []
+    for s in stations:
+        d = _haversine_km(lat, lon, s["lat"], s["lon"])
+        if d <= radius_km:
+            matches.append(NexradStation(
+                icao=s["icao"],
+                name=s["name"],
+                state=s["state"],
+                lat=s["lat"],
+                lon=s["lon"],
+                commissioned=s.get("commissioned"),
+                distance_km=round(d, 1),
+            ))
+    return sorted(matches, key=lambda x: x.distance_km or 0)
+    
     
 def get_station(icao: str) -> NexradStation | None:
     """Get a NEXRAD station by ICAO code."""
