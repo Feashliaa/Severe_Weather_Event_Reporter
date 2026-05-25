@@ -5,11 +5,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-
-# load file from nexrad_stations.json, which is a static dump, its in the same folder as this script
 STATIONS_PATH = Path(__file__).parent / "nexrad_stations.json"
-
-
 EXCLUDED_ICAOS = {"KCRI", "KOUN"} 
 
 @dataclass
@@ -35,6 +31,7 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 @lru_cache(maxsize=1)
 def _load_stations() -> list[dict]:
+    """Load the NEXRAD stations data from the json file, with caching"""
     with open(STATIONS_PATH) as f:
         return json.load(f)
 
@@ -76,6 +73,8 @@ def find_radars_within(lat: float, lon: float, radius_km: float = 230.0) -> list
     stations = _load_stations()
     matches = []
     for s in stations:
+        if s["icao"] in EXCLUDED_ICAOS:
+            continue
         d = _haversine_km(lat, lon, s["lat"], s["lon"])
         if d <= radius_km:
             matches.append(NexradStation(

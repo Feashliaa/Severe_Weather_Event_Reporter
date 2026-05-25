@@ -1,21 +1,16 @@
 """Assembles the final HTML report from structured data + LLM narrative."""
+import json
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
-from jinja2 import Environment, FileSystemLoader
-from src import config
-from src.llm.base import get_client
-from datetime import datetime
 from zoneinfo import ZoneInfo
 
-
-
-import json
-
 import markdown
-import shutil
+from jinja2 import Environment, FileSystemLoader
 
-STATIC_DIR = Path(__file__).parent / "static"
+from src.llm.base import get_client
+
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
@@ -105,7 +100,7 @@ def _format_time_with_local_tz(iso_str: str, local_tz: str) -> str:
         if local_tz == "UTC":
             return utc_part
         local_dt = dt.astimezone(ZoneInfo(local_tz))
-        local_part = local_dt.strftime("%-I:%M %p %Z").lstrip("0")
+        local_part = local_dt.strftime("%I:%M %p %Z").lstrip("0")
         return f"{utc_part} ({local_part})"
     except (ValueError, TypeError):
         return iso_str  # Return raw string if parsing fails

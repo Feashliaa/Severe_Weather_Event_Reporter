@@ -5,10 +5,6 @@ Usage:
     python -m scripts.run_event moore_2013
     python -m scripts.run_event --list
 """
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 import argparse
 
 from src.event_config import load_event, list_events

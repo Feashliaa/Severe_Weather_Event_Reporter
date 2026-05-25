@@ -12,9 +12,6 @@ DUAL_POL_DEPLOYED = date(2013, 4, 1)
 IEM_LSR_RELIABLE = date(2002, 1, 1)
 VTEC_WARNINGS_START = date(1996, 1, 1)
 
-
-
-
 @dataclass
 class FeatureAvailability:
     """ What data products are available for a given event data and radar """

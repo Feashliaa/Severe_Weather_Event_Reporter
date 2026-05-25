@@ -4,13 +4,11 @@ Uses IEM's vtec_events_bypoint.py endpoint to find all NWS-issued
 warnings whose polygons contained a given lat/lon during the window.
 """
 from datetime import datetime, timedelta
-from typing import Any
-from urllib import response
+from src import config
+from src.models import VTECEventRef
 
 import httpx
 
-from src import config
-from src.models import VTECEventRef
 
 BYPOINT_ENDPOINT = f"{config.IEM_API_BASE}/json/vtec_events_bypoint.py"
 
@@ -23,63 +21,54 @@ def discover_events(
     phenomena: tuple[str, ...] = ("TO", "SV"),
     significance: tuple[str, ...] = ("W",),
 ) -> list[VTECEventRef]:
-    """Find VTEC events whose SBW polygon contained (lat, lon) in the time window.
-
-    Args:
-        lat, lon: Point in decimal degrees
-        start, end: Time window (UTC)
-        phenomena: VTEC phenomena codes to include. Defaults to TO (Tornado)
-                   and SV (Severe Thunderstorm).
-        significance: VTEC significance codes. Defaults to W (Warning).
-
-    Returns a list of VTECEventRef, filtered to the time window and phenomena.
-    """
-    params = {
-    "lat": lat,
-    "lon": lon,
-    "sdate": start.strftime("%Y-%m-%d"),
-    "edate": (end + timedelta(days=1)).strftime("%Y-%m-%d"),
-    }
-    response = httpx.get(BYPOINT_ENDPOINT, params=params, timeout=30.0)
-    print(f"  Request URL: {response.url}")
-    print(f"  Response: {response.text[:500]}")
+    # Search center + 8 surrounding points in a 15km grid
+    # This handles cases where the user's location is near but not inside
+    # the warning polygon
+    offsets = [
+        (0, 0),
+        (0.15, 0), (-0.15, 0), (0, 0.15), (0, -0.15),
+        (0.15, 0.15), (0.15, -0.15), (-0.15, 0.15), (-0.15, -0.15),
+    ]
     
-    
-    response.raise_for_status()
-    raw = response.json()
-
-    pheno_set = set(phenomena)
-    sig_set = set(significance)
-
+    seen_etns: set[tuple] = set()
     results: list[VTECEventRef] = []
-    for event in raw.get("events", []):
-        
-        print(f"  Window: {start} to {end}")
-        
-        print(f"  Checking: {event.get('phenomena')}.{event.get('significance')}.{event.get('eventid')} issued {event.get('issue')}")
-        if event.get("phenomena") not in pheno_set:
-            print(f"    skipped: phenomena {event.get('phenomena')} not in {pheno_set}")
-            continue
-        if event.get("significance") not in sig_set:
-            print(f"    skipped: significance {event.get('significance')} not in {sig_set}")
-            continue
+    
+    for dlat, dlon in offsets:
+        params = {
+            "lat": lat + dlat,
+            "lon": lon + dlon,
+            "sdate": (start - timedelta(days=1)).strftime("%Y-%m-%d"),
+            "edate": (end + timedelta(days=1)).strftime("%Y-%m-%d"),
+        }
+        response = httpx.get(BYPOINT_ENDPOINT, params=params, timeout=30.0)
+        response.raise_for_status()
+        raw = response.json()
 
-        issue_str = event.get("issue")
-        if not issue_str:
-            print(f"    skipped: no issue time")
-            continue
-        issue = datetime.fromisoformat(issue_str.replace("Z", "+00:00"))
-        if issue < start or issue > end:
-            print(f"    skipped: {issue} outside [{start}, {end}]")
-            continue
+        pheno_set = set(phenomena)
+        sig_set = set(significance)
 
-        # Extract year from the issue time (events span calendar years)
-        results.append(VTECEventRef(
-            wfo=event["wfo"],
-            year=issue.year,
-            phenomena=event["phenomena"],
-            significance=event["significance"],
-            etn=event["eventid"],
-        ))
+        for event in raw.get("events", []):
+            if event.get("phenomena") not in pheno_set:
+                continue
+            if event.get("significance") not in sig_set:
+                continue
+            issue_str = event.get("issue")
+            if not issue_str:
+                continue
+            issue = datetime.fromisoformat(issue_str.replace("Z", "+00:00"))
+            print(f"    Checking {event.get('phenomena')}.{event.get('significance')}.{event.get('eventid')} issued {issue} vs window [{start}, {end}]")
+            if issue < start or issue > end:
+                print(f"      SKIPPED: outside window")
+                continue
+            key = (event["wfo"], event["phenomena"], event["significance"], event["eventid"])
+            if key not in seen_etns:
+                seen_etns.add(key)
+                results.append(VTECEventRef(
+                    wfo=event["wfo"],
+                    year=issue.year,
+                    phenomena=event["phenomena"],
+                    significance=event["significance"],
+                    etn=event["eventid"],
+                ))
 
     return results

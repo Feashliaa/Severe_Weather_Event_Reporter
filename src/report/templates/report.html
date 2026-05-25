@@ -46,13 +46,18 @@
     <div class="bg-[#003a8c] border-b-4 border-yellow-400">
         <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="bg-yellow-400 text-[#003a8c] font-black px-3 py-1 text-xs tracking-widest"
-                    style="font-family: 'Oswald', sans-serif;">SWX</div>
+                <div class="bg-yellow-400 hover:bg-yellow-300 font-black px-3 py-1 text-xs tracking-widest transition-colors"
+                    style="font-family: 'Oswald', sans-serif;">
+                    <a href="/" class="text-black text-xs uppercase tracking-widest">SWX</a>
+                </div>
                 <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter
                 </div>
             </div>
             <div class="flex items-center gap-4">
                 <span class="text-yellow-400 text-xs font-mono">{{ report.event_date }}</span>
+
+                <a href="javascript:window.print()"
+                    class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">Export PDF</a>
                 <a href="/" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">New Report</a>
                 <a href="/gallery" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">Previous
                     Reports</a>
@@ -188,7 +193,8 @@
                     <figure class="border-2 border-[#003a8c] bg-white mb-4">
                         <div
                             class="bg-[#003a8c] text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 flex justify-between items-center">
-                            <span id="loop-frame-label">FRAME 01 OF {{ "%02d" % (report.radar_images | length) }}</span>
+                            <span id="loop-frame-label">FRAME 01 OF {{ "%02d" % (report.radar_images | length)
+                                }}</span>
                             <span class="font-mono text-yellow-400" id="loop-timestamp">{{
                                 report.radar_features[0].timestamp[:19] if report.radar_features else "" }}</span>
                         </div>
@@ -279,17 +285,24 @@
                                     <td
                                         class="px-3 py-2 text-right font-mono font-bold text-red-700 border border-slate-300">
                                         {{ rf.max_reflectivity_dbz }}</td>
-                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">
+                                        {{
                                         rf.max_reflectivity_height_kft }}</td>
-                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">
+                                        {{
                                         rf.echo_top_18dbz_kft if rf.echo_top_18dbz_kft is not none else "—" }}</td>
-                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">
+                                        {{
                                         rf.echo_top_50dbz_kft if rf.echo_top_50dbz_kft is not none else "—" }}</td>
-                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
-                                        rf.max_inbound_velocity_kt if rf.max_inbound_velocity_kt is not none else "—" }}
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">
+                                        {{
+                                        rf.max_inbound_velocity_kt if rf.max_inbound_velocity_kt is not none else
+                                        "—" }}
                                     </td>
-                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">{{
-                                        rf.max_outbound_velocity_kt if rf.max_outbound_velocity_kt is not none else "—"
+                                    <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">
+                                        {{
+                                        rf.max_outbound_velocity_kt if rf.max_outbound_velocity_kt is not none else
+                                        "—"
                                         }}
                                     </td>
                                 </tr>
@@ -370,14 +383,16 @@
                                     class="font-bold uppercase tracking-wide {% if is_tornado %}text-red-700{% elif is_hail %}text-blue-700{% else %}text-slate-700{% endif %}"
                                     style="font-family: 'Oswald', sans-serif;">{{ lsr.event }}</span>
                                 {% endif %}
-                                {% if lsr.magnitude %}<span class="font-mono font-bold text-slate-900">{{ lsr.magnitude
+                                {% if lsr.magnitude %}<span class="font-mono font-bold text-slate-900">{{
+                                    lsr.magnitude
                                     }}</span>{% endif %}
                                 {% if lsr.city %}<span class="text-sm text-slate-700">{{ lsr.city }}</span>{%
                                 endif
                                 %}
                             </div>
                             {% if lsr.remarks %}
-                            <p class="text-sm text-slate-700 leading-relaxed mt-2 font-mono text-xs">{{ lsr.remarks }}
+                            <p class="text-sm text-slate-700 leading-relaxed mt-2 font-mono text-xs">{{ lsr.remarks
+                                }}
                             </p>
                             {% endif %}
                         </div>

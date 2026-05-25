@@ -81,6 +81,7 @@ def fetch_polygon(
     )
     return polygon_feature.get("geometry") if polygon_feature else None
 
+
 def fetch_lsrs_by_bbox(
     sts: str,
     ets: str,
@@ -159,5 +160,5 @@ def fetch_event_bundle(
         "locations": meta.get("locations"),
         "forecaster": meta.get("fcster"),
         "polygon": polygon,
-        "url": meta.get("url"),
+        "url": f"https://mesonet.agron.iastate.edu{meta.get('url', '')}",
     }

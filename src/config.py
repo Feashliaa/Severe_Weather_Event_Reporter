@@ -32,3 +32,5 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 NWS_API_BASE = "https://api.weather.gov"
 IEM_API_BASE = "https://mesonet.agron.iastate.edu"
 NEXRAD_S3_BUCKET = "noaa-nexrad-level2"
+
+PORT = 8000

@@ -19,20 +19,21 @@
     <div class="bg-[#003a8c] border-b-4 border-yellow-400">
         <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="bg-yellow-400 text-[#003a8c] font-black px-3 py-1 text-xs tracking-widest"
-                    style="font-family: 'Oswald', sans-serif;">SWX</div>
+                <div class="bg-yellow-400 font-black px-3 py-1 text-xs tracking-widest"
+                    style="font-family: 'Oswald', sans-serif;">
+                    <span class="text-black text-xs uppercase tracking-widest">SWX</span>
+                </div>
                 <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter
                 </div>
             </div>
             <div class="flex items-center gap-4">
-                <a href="/"
-                    class="text-yellow-400 text-xs uppercase tracking-widest font-bold border-b-2 border-yellow-400">New
-                    Report</a>
+                <a href="/" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">New Report</a>
                 <a href="/gallery" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">Previous
                     Reports</a>
             </div>
         </div>
     </div>
+
 
     <div class="max-w-5xl mx-auto px-4 py-8">
         <div class="bg-white border-2 border-[#003a8c] shadow-[3px_3px_0_rgba(0,58,140,0.15)]">
@@ -124,6 +125,17 @@
     </div>
 
     <script src="/static/form.js" defer></script>
+
+    <script>
+        // Highlight the nav link that matches the current URL
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('a[href]').forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('text-yellow-400', 'font-bold', 'border-b-2', 'border-yellow-400');
+                link.classList.remove('text-white');
+            }
+        });
+    </script>
 
 </body>
 

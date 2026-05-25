@@ -33,3 +33,6 @@ geopy
 fastapi
 uvicorn
 timezonefinder
+
+# print to pdf
+weasyprint

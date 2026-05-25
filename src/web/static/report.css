@@ -139,3 +139,63 @@ details:not([open]) .collapse-marker {
     vertical-align: middle;
     margin-right: 6px;
 }
+
+@media print {
+
+    /* Hide interactive/nav elements */
+    nav,
+    #lightbox,
+    .collapse-marker,
+    #loop-playpause,
+    #loop-scrubber,
+    #loop-speed,
+    .cursor-pointer summary {
+        cursor: default;
+    }
+
+    /* Force details open */
+    details {
+        display: block !important;
+    }
+
+    details>*:not(summary) {
+        display: block !important;
+    }
+
+    /* Page breaks between sections */
+    #narrative {
+        page-break-before: avoid;
+    }
+
+    #radar {
+        page-break-before: always;
+    }
+
+    #scans {
+        page-break-before: always;
+    }
+
+    #warnings {
+        page-break-before: always;
+    }
+
+    #lsrs {
+        page-break-before: always;
+    }
+
+    /* Avoid breaks inside cards */
+    .gov-card {
+        page-break-inside: avoid;
+    }
+
+    /* Clean background for print */
+    body {
+        background: white !important;
+    }
+
+    /* Keep header but remove links */
+    .bg-\[\#003a8c\] {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}

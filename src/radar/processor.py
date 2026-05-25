@@ -7,9 +7,7 @@ important features and hands the LLM structured numbers.
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
-
-import numpy as np
-import pyart
+import sys, json, pyart, numpy as np
 
 MAX_PLAUSIBLE_KFT = 70.0
 MAX_PLAUSIBLE_DBZ = 75.0
@@ -60,7 +58,7 @@ def extract_features(level2_path: Path) -> RadarFeatures:
 
     notes_parts = []
 
-# --- Reflectivity ---
+    # --- Reflectivity ---
     max_z = max_z_height = echo_top_18 = echo_top_50 = None
     if "reflectivity" in radar.fields:
         z = radar.fields["reflectivity"]["data"]
@@ -123,10 +121,8 @@ def extract_features(level2_path: Path) -> RadarFeatures:
 
 
 if __name__ == "__main__":
-    import sys
     if len(sys.argv) < 2:
         print("Usage: python -m src.radar.processor <path_to_level2_file>")
         sys.exit(1)
     features = extract_features(Path(sys.argv[1]))
-    import json
     print(json.dumps(features.to_dict(), indent=2))

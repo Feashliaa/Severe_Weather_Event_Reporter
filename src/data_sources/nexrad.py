@@ -1,9 +1,11 @@
-"""NEXRAD Level II from NOAA's public AWS S3 bucket.
+"""NEXRAD Level II from the Unidata/NOAA public AWS S3 archive.
 
-Bucket: noaa-nexrad-level2
+Bucket: unidata-nexrad-level2 (migrated from noaa-nexrad-level2, Sept 2025)
 Path format: {year}/{month:02d}/{day:02d}/{site}/{site}YYYYMMDD_HHMMSS_V06
-
 Uses the `nexradaws` package which wraps S3 access. No AWS credentials needed.
+
+Note: Archive coverage begins June 1991. Early years (1991-1995) may have
+gaps for some radar sites depending on when they were commissioned.
 """
 from datetime import datetime
 from pathlib import Path
@@ -47,7 +49,10 @@ def pick_key_scans(
     scans: list[Any],
     max_scans: int = 5,
 ) -> list[Any]:
-    """Down-select a long list of scans to a manageable subset for the report.
+    """Down-select scans to a manageable subset using even spacing.
+
+    Selects max_scans evenly distributed across the full time window.
+    If fewer scans exist than max_scans, returns all of them.
     """
     if len(scans) <= max_scans:
         return scans

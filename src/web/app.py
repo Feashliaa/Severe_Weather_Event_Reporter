@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date as date_type
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -15,20 +15,24 @@ from src.report.builder import EventReport, build_html_string
 
 from src import config
 
+#from weasyprint import HTML as WeasyHTML
+
 import json
 
 app = FastAPI(title="Severe Weather Event Reporter")
 
+_jobs: dict[str, dict] = {}
+# Structure: {"status": "processing"|"done"|"failed", "message": str, "error": str|None}
+
 NEXRAD_START = date_type(1991, 6, 1)
 
-# Serve the output directory under /reports
-# This makes /reports/<slug>/static/* and /reports/<slug>/images/* work for free.
 WEB_STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(WEB_STATIC_DIR)), name="static")
 
 class ReportRequest(BaseModel):
+    """Minimum input required to generate a report via the API."""
     event_name: str
     location: str
     lat: float | None = None     # if provided, skip backend geocoding
@@ -38,6 +42,42 @@ class ReportRequest(BaseModel):
     end_time: str | None = None
     tz_mode: str = "local"
 
+
+def _run_pipeline_job(
+    slug: str,
+    event_name: str,
+    event_date: str,
+    location: str,
+    start_utc: datetime,
+    end_utc: datetime,
+    lat: float,
+    lon: float,
+    tz_name: str,
+)-> None:
+    """Wrapper that runs the pipeline and updates job state"""
+    
+    def progress(msg: str) -> None:
+        _jobs[slug]["message"] = msg
+    
+    try:
+        run_pipeline(
+            event_name=event_name,
+            event_date=event_date,
+            location=location,
+            radar_site=None,
+            start=start_utc,
+            end=end_utc,
+            vtec_events=None,
+            auto_discover=True,
+            zoom_lat=lat,
+            zoom_lon=lon,
+            local_timezone=tz_name,
+            progress=progress
+        )
+        _jobs[slug] = {"status": "done", "message" : "Complete", "error": None}
+    except Exception as e:
+        _jobs[slug] = {"status": "failed", "message" : "Failed", "error": str(e)}
+        
 
 @app.get("/")
 async def index(request: Request):
@@ -50,7 +90,7 @@ async def health():
 
 
 @app.post("/reports")
-async def create_report(req: ReportRequest):
+async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
     """Generate a new report from minimum input."""
     try:
         event_date = datetime.strptime(req.date, "%Y-%m-%d").date()
@@ -95,26 +135,28 @@ async def create_report(req: ReportRequest):
         end_utc += timedelta(days=1)
 
     slug = req.event_name.lower().replace(" ", "_")
+    
+    # If already done, just redirect
+    if (config.OUTPUT_DIR / slug / "report_data.json").exists():
+        return RedirectResponse(url=f"/reports/{slug}/", status_code=303)
+    
+    _jobs[slug] = {"status": "processing", "error": None}
 
-    try:
-        run_pipeline(
-            event_name=req.event_name,
-            event_date=event_date.strftime("%B %d, %Y"),
-            location=req.location,
-            radar_site=None,  # type: ignore
-            start=start_utc,
-            end=end_utc,
-            vtec_events=None,
-            auto_discover=True,
-            zoom_lat=lat,
-            zoom_lon=lon,
-            local_timezone=tz_name,
-            force=False,
-        )
-    except Exception as e:
-        raise HTTPException(500, f"Pipeline failed: {e}")
+    background_tasks.add_task(
+        _run_pipeline_job,
+        slug=slug,
+        event_name=req.event_name,
+        event_date=event_date.strftime("%B %d, %Y"),
+        location=req.location,
+        start_utc=start_utc,
+        end_utc=end_utc,
+        lat=lat,
+        lon=lon,
+        tz_name=tz_name,
+    )
 
-    return RedirectResponse(url=f"/reports/{slug}/", status_code=303)
+    return RedirectResponse(url=f"/reports/{slug}/status", status_code=303)
+
 
 @app.get("/gallery")
 async def gallery(request: Request):
@@ -165,3 +207,57 @@ async def report_image(slug: str, filename: str):
     if not img_path.exists():
         raise HTTPException(404)
     return FileResponse(img_path)
+
+
+@app.get("/reports/{slug}/status")
+async def report_status_page(slug: str, request: Request):
+    """Renders the status polling page."""
+    # If report already exists (e.g. cached), redirect immediately
+    if (config.OUTPUT_DIR / slug / "report_data.json").exists():
+        return RedirectResponse(url=f"/reports/{slug}/", status_code=303)
+    return templates.TemplateResponse(request, "status.html", {"slug": slug})
+
+
+@app.get("/reports/{slug}/status.json")
+async def report_status_json(slug: str):
+    if (config.OUTPUT_DIR / slug / "report_data.json").exists():
+        return {"status": "done", "message": "Complete"}
+    job = _jobs.get(slug)
+    if job is None:
+        raise HTTPException(404, "Job not found")
+    return job
+
+# This will be used if I add WeasyPDF - The print screen is good enough at the moment
+# @app.get("/reports/{slug}/pdf")
+# async def export_pdf(slug: str):
+#     """Exports the HTML to a PDF"""
+#     data_path = config.OUTPUT_DIR / slug / "report_data.json"
+    
+#     if not data_path.exists():
+#         raise HTTPException(404, f"Report not found: {slug}")
+    
+#     data = json.loads(data_path.read_text())
+    
+#     report = EventReport(
+#         event_name=data["event_name"],
+#         event_date=data["event_date"],
+#         location=data["location"],
+#         narrative=data.get("narrative", ""),
+#         warnings=data.get("warnings", []),
+#         lsrs=data.get("lsrs", []),
+#         radar_features=data.get("radar_features", []),
+#         radar_images=data.get("radar_images", []),
+#         feature_notes=data.get("feature_notes", []),
+#     )
+    
+#     html_string = build_html_string(report, local_timezone=data.get("local_timezone", "UTC"))
+    
+#     base_url = f"http://localhost:{config.PORT}"
+#     pdf_bytes = WeasyHTML(string=html_string, base_url=base_url).write_pdf()
+    
+#     filename = f"{slug}.pdf"
+#     return Response(
+#         content=pdf_bytes,
+#         media_type="application/pdf",
+#         headers={"Content-Disposition": f"attachment; filename={filename}"}   
+#     ) 

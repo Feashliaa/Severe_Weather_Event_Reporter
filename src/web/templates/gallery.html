@@ -15,18 +15,20 @@
     <div class="bg-[#003a8c] border-b-4 border-yellow-400">
         <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="bg-yellow-400 text-[#003a8c] font-black px-3 py-1 text-xs tracking-widest"
-                    style="font-family: 'Oswald', sans-serif;">SWX</div>
+                <div class="bg-yellow-400 hover:bg-yellow-300 font-black px-3 py-1 text-xs tracking-widest transition-colors"
+                    style="font-family: 'Oswald', sans-serif;">
+                    <a href="/" class="text-black text-xs uppercase tracking-widest">SWX</a>
+                </div>
                 <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter
                 </div>
             </div>
             <div class="flex items-center gap-4">
                 <a href="/" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">New Report</a>
-                <a href="/gallery"
-                    class="text-yellow-400 text-xs uppercase tracking-widest font-bold border-b-2 border-yellow-400">Previous
+                <a href="/gallery" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">Previous
                     Reports</a>
             </div>
         </div>
+    </div>
     </div>
 
     <div class="max-w-5xl mx-auto px-4 py-8">
@@ -78,6 +80,17 @@
         </div>
         {% endif %}
     </div>
+
+    <script>
+        // Highlight the nav link that matches the current URL
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('a[href]').forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('text-yellow-400', 'font-bold', 'border-b-2', 'border-yellow-400');
+                link.classList.remove('text-white');
+            }
+        });
+    </script>
 
 </body>
 
