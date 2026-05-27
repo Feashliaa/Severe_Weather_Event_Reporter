@@ -38,6 +38,8 @@
         href="https://fonts.googleapis.com/css2?family=VT323&family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/static/report.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
@@ -83,6 +85,15 @@
                     </svg>
                     NARRATIVE
                 </a>
+                {% if report.lsrs or report.warnings or report.ncei_events %}<a href="#map" class="nav-tab">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round"
+                        style="display:inline;vertical-align:middle;margin-right:5px">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    MAP
+                </a>{% endif %}
                 {% if report.radar_images %}<a href="#radar" class="nav-tab">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round"
@@ -185,6 +196,34 @@
                 </article>
             </details>
         </section>
+
+        {% if report.lsrs or report.warnings or report.ncei_events %}
+        <section id="map" class="gov-card mb-4 scroll-mt-20">
+            <details open>
+                <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
+                    <span>EVENT MAP</span>
+                    <svg class="collapse-marker text-yellow-400" width="16" height="16" viewBox="0 0 24 24"
+                        fill="currentColor">
+                        <polygon points="4,8 20,8 12,18" />
+                    </svg>
+                </summary>
+                <div class="p-5 md:p-7">
+                    <div id="event-map" style="height: 450px; border: 2px solid #003a8c;"
+                        data-lat="{{ report.warnings[0].polygon.coordinates[0][0][1] if report.warnings and report.warnings[0].polygon else report.lsrs[0].lat if report.lsrs else 39.0 }}"
+                        data-lon="{{ report.warnings[0].polygon.coordinates[0][0][0] if report.warnings and report.warnings[0].polygon else report.lsrs[0].lon if report.lsrs else -98.0 }}"
+                        data-warnings='{{ report.warnings | tojson }}' data-lsrs='{{ report.lsrs | tojson }}'
+                        data-ncei='{{ report.ncei_events | tojson }}'>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">
+                        <span class="inline-block w-3 h-3 bg-red-600 mr-1"></span> Tornado Warning
+                        <span class="inline-block w-3 h-3 bg-yellow-400 ml-3 mr-1"></span> Severe Thunderstorm Warning
+                        <span class="inline-block w-3 h-3 bg-red-900 ml-3 mr-1"></span> Tornado Track (NCEI)
+                        <span class="inline-block w-3 h-3 rounded-full bg-blue-500 ml-3 mr-1"></span> LSR
+                    </p>
+                </div>
+            </details>
+        </section>
+        {% endif %}
 
         {% if report.radar_images %}
         <section id="radar" class="gov-card mb-4 scroll-mt-20">
@@ -528,6 +567,7 @@
 
     <script src="/static/lightbox.js"></script>
     <script src="/static/radar-loop.js"></script>
+    <script src="/static/event-map.js"></script>
 </body>
 
 </html>
