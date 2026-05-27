@@ -1,169 +1,167 @@
 # Severe Weather Event Reporter
 
-An AI-powered tool that auto-generates polished post-event reports for severe weather events. Pulls NWS warnings, Local Storm Reports, and archived NEXRAD Level II radar data, then assembles a structured timeline with embedded radar imagery, an animated radar loop, and a coherent written narrative - the kind of post-event breakdown that normally takes hours to produce manually.
+An AI-powered post-event severe weather report generator. Input a location, date, and time window - the tool fetches NWS warnings, Local Storm Reports (IEM), NCEI Storm Events survey data, and archived NEXRAD Level II radar, then produces a polished HTML report with an animated radar loop, interactive event map, volume scan analysis table, and a structured LLM narrative grounded entirely in real meteorological data.
 
-## Problem
+The kind of breakdown that normally takes a meteorologist hours to assemble manually - I've got something automated down to running in about 3-5 minutes.
 
-Major events (EF4/EF5s, big outbreaks) get manual writeups from NWS, media, etc within days. But the long tail - EF1-EF3s in rural areas, marine waterspouts, hail events, derecho segments - mostly get a tweet and a database entry. This tool fills that gap, plus serves researchers, insurance, emergency managers, and weather enthusiasts who want to understand "what happened last Tuesday in [random county]" without piecing it together manually.
+## The Problem
 
-## Differentiators
+Major events get coverage. EF4-5s, significant outbreaks, high-fatality events - NWS publishes service assessments, media writes them up, researchers document them. But the long tail doesn't. EF1-EF3s in rural counties, isolated hail events, derecho segments, marginally tornadic nights - they get a database entry and maybe a tweet. Weeks later, nobody can answer "what actually happened Tuesday night in [county]" without spending an hour piecing together IEM, NCEI, and S3 radar files manually.
 
-Versus existing tools (IEM Raccoon, NCEI Storm Events, NWS service assessments):
+This tool can potentially fill that gap.
 
-- **Polished, shareable output** - modern web report with retro TWC/weather.gov aesthetic
-- **AI narrative grounded in structured data** - the LLM writes from extracted numeric features (max reflectivity, echo tops, velocity couplets, warning timing), not by hallucinating from images
-- **Speed** - minutes, not hours or months
-- **Self-serve** - anyone can generate a report on any event in the archive via a simple web form
-- **Auto-discovery** - supply just a location and date; the tool finds the warnings, picks the right radar, and pulls the LSRs automatically
+## What It Produces
 
-## Current Status
+Each report includes:
 
-**Working:**
-- End-to-end pipeline from event input to rendered HTML report
-- Web form with autocomplete location search and timezone-aware time input
-- Auto-discovery of NWS warnings from a date/location
-- Geocoding via OSM Nominatim + automatic nearest-NEXRAD lookup
-- Dual-panel reflectivity + velocity radar rendering via Py-ART
-- Animated radar loop with playback controls
-- Comprehensive LSR fetch with deduplication and priority sorting
-- LLM narrative grounded in extracted radar features and structured data
-- Feature gating based on event date (graceful degradation for pre-NEXRAD or pre-dual-pol events)
-
-**Tested on:** Joplin (2011), Moore (2013), Mayfield (2021), Greenfield (2024), and a recent live event (Bogue Chitto May 2026)
+- **AI narrative** - structured overview, storm evolution, warnings issued, impacts and conclusion. Written from extracted numeric radar features and structured warning/LSR/NCEI data, not hallucinated from images
+- **Animated radar loop** - reflectivity + velocity (+ correlation coefficient + spectrum width for 2013+ events), dark map background, county lines, city labels, event location marked
+- **Volume scan analysis table** - max dBZ, echo tops, velocity couplet, timestamped for each processed scan
+- **Interactive event map** - Leaflet map with warning polygons, LSR points, and NCEI tornado tracks color-coded by EF rating
+- **Active warnings section** - all VTEC warnings with issued/expired times, polygon coverage, forecaster
+- **Local storm reports** - deduplicated, polygon-filtered, color-coded by type
+- **NCEI Storm Survey data** - post-survey verified EF rating, path length/width, fatalities, injuries, property damage, full NWS event narrative
 
 ## Stack
 
 | Layer | Choice |
 |---|---|
 | Backend | Python + FastAPI |
-| Frontend | Vanilla JS + Tailwind CSS + Jinja2 templates |
-| Geo/Map | Leaflet + leaflet-geosearch (OSM Nominatim) |
-| Radar | Py-ART + matplotlib |
-| LLM | Model-agnostic (Claude, GPT, Gemini) - BYOK |
-
-### Key Python Libraries
-
-- `fastapi` + `uvicorn` - web framework
-- `pyart` - NEXRAD Level II radar processing
-- `httpx` - HTTP client for data source APIs
-- `pydantic` - request validation
-- `geopy` + `timezonefinder` - geocoding and timezone resolution
-- `markdown` - converts LLM markdown output to HTML
-- `jinja2` - HTML templating
-- `anthropic`, `openai`, `google-genai` - LLM clients
+| Frontend | Vanilla JS + Tailwind CSS + Jinja2 |
+| Radar processing | Py-ART + matplotlib + Cartopy |
+| Maps | Leaflet + CartoDB dark tiles |
+| LLM | Model-agnostic (Claude, Gemini, GPT) - BYOK |
+| Geocoding | OSM Nominatim + timezonefinder |
 
 ## Data Sources
 
-| Source | Purpose | Access |
-|---|---|---|
-| NOAA NEXRAD on AWS S3 | Level II radar files | `s3://noaa-nexrad-level2/` |
-| IEM Mesonet | Historical warnings (VTEC), LSRs, polygon archives | `mesonet.agron.iastate.edu` |
-| OSM Nominatim | Geocoding + autocomplete | `nominatim.openstreetmap.org` |
-| NCEI Storm Events DB | Authoritative post-survey records | Planned for Phase 2 |
+| Source | What it provides |
+|---|---|
+| NOAA NEXRAD on AWS S3 (`noaa-nexrad-level2`) | Level II radar archive, 1991–present |
+| IEM Mesonet | VTEC warning archive, storm-based warning polygons, LSRs |
+| NCEI Storm Events Database | Post-survey EF ratings, path dimensions, casualties, damage estimates |
+| OSM Nominatim | Geocoding + location autocomplete |
 
 ## Feature Availability by Date
 
-The pipeline gates features based on when products became available:
+The pipeline gates features based on historical product availability and per-radar commissioning dates:
 
-- **NEXRAD Level II radar** - per-radar commissioning dates (1991-2014, mostly 1993-1996)
-- **Storm-Based Warning polygons** - October 2007
-- **Dual-polarization radar (CC, ZDR)** - March 2013
-- **Reliable IEM LSR archives** - 2002
+| Feature | Available from |
+|---|---|
+| NEXRAD Level II radar | Per-radar (most 1993-1996, all CONUS by 1997) |
+| IEM LSR archives | ~2002 |
+| VTEC warning system | January 1996 |
+| Storm-based warning polygons | October 2007 |
+| Dual-polarization (CC, spectrum width) | March 2013 |
 
-Pre-cutoff events generate reports with the available data and a notice explaining what's missing.
+Pre-cutoff events generate reports with available data and a notice explaining what's missing.
 
-## Project Structure
-
-```
-severe_weather_event_reporter/
-├── README.md
-├── .gitignore
-├── .env.example
-├── requirements.txt
-├── docker-compose.yml          # v2+
-├── Dockerfile                  # v2+
-│
-├── src/
-│   ├── config.py               # env vars, settings
-|   ├── models.py               # shared dataclasses (VTECEventRef)
-│   ├── pipeline.py             # main orchestrator
-│   ├── event_config.py         # JSON-defined event configs
-│   ├── feature_gates.py        # date-based product availability
-│   │
-│   ├── data_sources/           # API clients for external data
-│   │   ├── geocoding.py        # OSM Nominatim + timezone
-│   │   ├── radar_locator.py    # nearest NEXRAD lookup
-│   │   ├── iem.py              # IEM archive
-│   │   ├── nexrad.py           # NEXRAD Level II from S3
-│   │   └── discovery.py        # auto-discover warnings at a point
-│   │
-│   ├── radar/                  # radar processing
-│   │   ├── processor.py        # Py-ART wrapper, feature extraction
-│   │   └── renderer.py         # image rendering
-│   │
-│   ├── llm/                    # LLM adapters
-│   │   ├── base.py             # abstract interface
-│   │   ├── anthropic_client.py
-│   │   ├── openai_client.py
-│   │   └── gemini_client.py
-│   │
-│   ├── report/                 # report assembly
-│   │   ├── builder.py          # orchestrates data > narrative > HTML
-│   │   ├── static/         
-│   │   └── templates/
-│   │       └── report.html
-│   │  
-│   └── web/                    # FastAPI app
-│       ├── app.py
-│       ├── templates/index.html
-│       └── static/form.js
-│
-├── scripts/
-│   ├── run_event.py            # CLI runner - loads events/*.json
-│   ├── build_nexrad_stations.py
-│   └── add_commission_dates.py
-│
-├── events/                     # event config JSON (legacy, kept for tests)
-│   ├── joplin_2011.json
-│   ├── moore_2013.json
-│   └── mayfield_2021.json
-│
-└── output/                     # generated reports (gitignored)
-```
 ## Getting Started
 
 ```bash
-python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+git clone https://github.com/Feashliaa/Severe_Weather_Event_Reporter
+cd Severe_Weather_Event_Reporter
+
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # Linux/macOS
+
 pip install -r requirements.txt
 cp .env.example .env
-# Add your Gemini/Anthropic/OpenAI API key to .env
+# Add your LLM API key to .env (ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY)
 
 uvicorn src.web.app:app --reload --port 8000
-# Open http://localhost:8000 in a browser
 ```
 
-Or run a preconfigured event from the command line:
+Open `http://localhost:8000`, enter an event name, location, and date range.
 
-```bash
-python -m scripts.run_event joplin_2011
-```
+Reports take about 3-5 minutes to generate (radar rendering is the bottleneck). Progress is shown live on the status page.
+
+## Project Structure
+
+severe_weather_event_reporter/
+├── src/
+│   ├── config.py                   # env vars, paths
+│   ├── models.py                   # shared dataclasses
+│   ├── pipeline.py                 # main orchestrator
+│   ├── feature_gates.py            # date-based product availability
+│   │
+│   ├── data_sources/
+│   │   ├── geocoding.py            # Nominatim + timezone + state/county parsing
+│   │   ├── radar_locator.py        # nearest NEXRAD lookup
+│   │   ├── iem.py                  # IEM warnings + LSRs
+│   │   ├── nexrad.py               # NEXRAD Level II from S3
+│   │   ├── discovery.py            # auto-discover warnings at a point
+│   │   └── ncei.py                 # NCEI Storm Events CSV client
+│   │
+│   ├── radar/
+│   │   ├── processor.py            # Py-ART feature extraction
+│   │   └── renderer.py             # Cartopy quad-panel rendering
+│   │
+│   ├── report/
+│   │   ├── builder.py              # EventReport dataclass + LLM prompt
+│   │   ├── templates/report.html
+│   │   └── static/                 # report.css, radar-loop.js, event-map.js
+│   │
+│   └── web/
+│       ├── app.py                  # FastAPI routes + background jobs
+│       ├── templates/              # index.html, gallery.html, status.html
+│       └── static/form.js
+│
+├── scripts/
+│   ├── run_event.py                # CLI runner for JSON event configs
+│   └── download_ncei.py            # bulk NCEI CSV downloader
+│
+├── events/                         # JSON event configs (for CLI use)
+├── .cache/                         # downloaded radar files + NCEI CSVs (gitignored)
+└── output/                         # generated reports (gitignored)
+
+## Tested Events
+
+| Event | Date | Notes |
+|---|---|---|
+| Joplin, MO tornado | May 22, 2011 | EF5, 161 fatalities |
+| Moore, OK tornado | May 20, 2013 | EF5, first dual-pol test |
+| Hackleburg, AL tornado | April 27, 2011 | Part of 2011 Super Outbreak |
+| Greenfield, IA tornado | May 21, 2024 | EF4, 4 fatalities |
+| Mayfield, KY tornado | December 10, 2021 | EF4, night event |
+| Rolling Fork, MS tornado | March 24, 2023 | EF4 |
+| Enderlin, ND tornado | June 20, 2025 | EF5, train derailment |
+| Enid, OK tornado | April 23, 2026 | EF4, recent live event |
+| Bogue Chitto, MS tornado | 2026 | Recent live event |
 
 ## Roadmap
 
-### Phase 1 - Date-based feature gating | Done
-### Phase 2 - Print/PDF export (in progress)
-### Phase 3 - Cartopy map overlay on radar (county lines, town labels)
-### Phase 4 - NCEI Storm Events DB integration (authoritative post-survey records)
-### Phase 5 - Multi-radar support for long-track events
-### Phase 6 - Storm-relative velocity (SRV) product
-### Phase 7 - Dual-pol products (CC, ZDR) for 2013+ events
+**Done:**
+- End-to-end pipeline (warnings -> LSRs -> NCEI -> radar -> LLM -> report)
+- Auto-discovery of warnings via 9-point grid search
+- S3 radar fallback loop (tries nearest radar, falls back if no archive data)
+- Feature gating with graceful degradation for historical events
+- Dual-polarization radar panels (CC + spectrum width) for 2013+ events
+- Cartopy map overlay with dark background, county/state lines, city labels
+- Background jobs with real-time progress updates
+- Report caching + gallery
+- NCEI Storm Events integration
+- Interactive Leaflet event map with warning polygons + LSR points + tornado tracks
+- Concurrent pipeline prevention
 
-### Eventually
-- Persistence (Postgres) + report history
-- Auth + BYOK API keys
-- Public gallery of pre-rendered demo events
-- Click-on-map location selection (Leaflet map UI)
+**Planned:**
+- Dockerize + Railway deployment
+- PostgreSQL for report storage + NCEI data (replaces flat files)
+- Celery + Redis job queue (replaces BackgroundTasks)
+- Cloudflare R2 for radar image storage
+- Multi-radar support for long-track events
+- SPC tornado path polygons overlay
+- Impact summary card
+- Storm-relative velocity (SRV) product
+
+## Notes
+
+- Reports are generated on-demand and cached. Re-requesting the same event name redirects to the existing report instantly.
+- Only one pipeline runs at a time. Concurrent submissions return a 429 with a retry message.
+- NEXRAD archive starts June 1991. Events before that date are not supported.
+- NCEI Storm Events data lags 4-8 weeks for recent events. The pipeline falls back to LSR data when NCEI has no record yet.
+- LLM API keys are user-supplied (BYOK). The tool is model-agnostic - Claude, GPT-5, and Gemini are all supported.
 
 ## License
 
