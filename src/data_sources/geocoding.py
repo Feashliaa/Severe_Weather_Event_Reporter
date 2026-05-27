@@ -64,9 +64,7 @@ def get_timezone(lat: float, lon: float) -> str:
 
 def _parse_state_county(display_name: str) -> tuple[str | None, str | None]:
     """Extract state and county from Nominatim display name.
-    
-    e.g. 'Greenfield, Adair County, Iowa, United States' 
-    → ('IOWA', 'ADAIR')
+
     """
     parts = [p.strip() for p in display_name.split(",")]
     state = None
