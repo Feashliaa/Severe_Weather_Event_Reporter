@@ -23,6 +23,7 @@ class EventReport:
     summary_metadata: dict[str, Any] = field(default_factory=dict)
     warnings: list[dict[str, Any]] = field(default_factory=list)
     lsrs: list[dict[str, Any]] = field(default_factory=list)
+    ncei_events: list[dict[str, Any]] = field(default_factory=list)
     radar_features: list[dict[str, Any]] = field(default_factory=list)
     radar_images: list[str] = field(default_factory=list)
     feature_notes: list[str] = field(default_factory=list)
@@ -69,6 +70,12 @@ WARNINGS ISSUED ({len(report.warnings)} total):
 
 LOCAL STORM REPORTS ({len(report.lsrs)} total):
 {json.dumps(report.lsrs, indent=2, default=str)}
+
+NCEI STORM EVENTS ({len(report.ncei_events)} records - post-survey verified data):
+These are authoritative NWS post-storm survey records. When available, prefer these
+over LSR data for EF ratings, path dimensions, casualties, and damage estimates.
+
+{json.dumps(report.ncei_events, indent=2, default=str)}
 
 RADAR FEATURES (extracted numerically from Level II volume scans):
 Each entry is one volume scan. Fields: max reflectivity (dBZ), height of max

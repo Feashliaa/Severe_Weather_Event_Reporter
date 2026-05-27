@@ -5,21 +5,21 @@ Each step is extracted into a helper function for testability and clarity.
 """
 import json
 import math
-from datetime import datetime, timedelta, timezone
+import time
+from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
 from shapely.geometry import Point, shape
 from shapely.ops import unary_union
 
 from src import config
-from src.data_sources import discovery, geocoding, iem, nexrad, radar_locator
+from src.data_sources import discovery, geocoding, iem, nexrad, radar_locator, ncei
 from src.feature_gates import feature_availability, FeatureAvailability
 from src.models import VTECEventRef
 from src.radar import processor as radar_processor
 from src.radar import renderer as radar_renderer
 from src.report.builder import EventReport, generate_narrative
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from typing import Callable
 
@@ -172,7 +172,7 @@ def _fetch_lsrs(
     lon_pad = lsr_search_km * deg_per_km_lon
 
     lsr_start = start - timedelta(hours=1)
-    lsr_end = end + timedelta(hours=6)
+    lsr_end = end + timedelta(days=3)
 
     _p(f"  Fetching LSRs within {lsr_search_km:.0f}km of {zoom_lat:.3f}, {zoom_lon:.3f}...")
     bbox_lsrs = iem.fetch_lsrs_by_bbox(
@@ -216,6 +216,34 @@ def _fetch_lsrs(
     return lsrs
 
 
+def _fetch_ncei(
+    event_date: date,
+    location_display_name: str,
+    progress: Callable[[str], None] | None = None,
+) -> list[dict]:
+    """Fetch NCEI Storm Events for the event date and location."""
+    def _p(msg: str) -> None:
+        print(msg)
+        if progress: progress(msg)
+
+    state, county = geocoding._parse_state_county(location_display_name)
+    if not state:
+        _p("  Skipping NCEI lookup (could not determine state from location)")
+        return []
+
+    _p(f"  Fetching NCEI storm events for {state}, {county or 'all counties'} on {event_date}...")
+    try:
+        events = ncei.fetch_storm_events(
+            event_date=event_date,
+            state=state,
+            county=county,
+        )
+        _p(f"    Found {len(events)} NCEI storm events")
+        return events
+    except Exception as e:
+        _p(f"  NCEI fetch failed: {e}")
+        return []
+
 def _process_scan(
     path: Path,
     images_dir: Path,
@@ -224,6 +252,7 @@ def _process_scan(
     zoom_km: float,
     radar_site_lat: float | None,
     radar_site_lon: float | None,
+    event_name: str | None,
     progress: Callable[[str], None] | None = None,
 ) -> tuple[dict, str] | None:
     """Process a single radar scan. Returns (features_dict, image_path) or None on failure"""
@@ -244,6 +273,7 @@ def _process_scan(
             zoom_km=zoom_km,
             radar_site_lat=radar_site_lat,
             radar_site_lon=radar_site_lon,
+            event_label=event_name
         )
         _p(f"    {features.timestamp}: {features.max_reflectivity_dbz} dBZ, top {features.echo_top_18dbz_kft} kft => rendered {img_path.name}")
         return features.to_dict(), f"images/{img_path.name}"
@@ -263,54 +293,41 @@ def _process_radar(
     zoom_km: float,
     radar_site_lat: float | None,
     radar_site_lon: float | None,
+    event_name: str,
     progress: Callable[[str], None] | None = None,
 ) -> tuple[list, list]:
     """Download and process radar scans. Returns (radar_features, radar_images)."""
-    
+
     def _p(msg: str) -> None:
         print(msg)
         if progress: progress(msg)
-    
-    _p(f"  Listing radar scans for {radar_site} between {start} and {end}...")
+
     all_scans = nexrad.list_scans(radar_site, start, end)
-    _p(f"    Found {len(all_scans)} scans, selecting up to {max_radar_scans}...")
     key_scans = nexrad.pick_key_scans(all_scans, max_scans=max_radar_scans)
 
-    _p(f"  Downloading {len(key_scans)} scans...")
+    t0 = time.time()
+    _p(f"  Downloading {len(key_scans)} of {len(all_scans)} scans...")
     local_paths = nexrad.download_scans(key_scans)
+    print(f"    Download took {time.time() - t0:.1f}s")
 
-    _p(f"  Processing {len(local_paths)} scans (parallel) ...")
-
-    # Currently 2 threads
-    n_workers = min(2, len(local_paths))
-
-    results: dict[Path, tuple[dict, str] | None] = {}
-    completed = 0
-    with ThreadPoolExecutor(max_workers=n_workers) as executor:
-        futures = {
-            executor.submit(
-                _process_scan,
-                path, images_dir, zoom_lat, zoom_lon, zoom_km,
-                radar_site_lat, radar_site_lon, progress,
-            ): path
-            for path in local_paths
-        }
-        for future in as_completed(futures):
-            path = futures[future]
-            results[path] = future.result()
-            completed += 1
-            _p(f"  Rendered scan {completed} of {len(local_paths)}...")
-
-    # Reassemble in original scan order (as_completed returns out of order)
     radar_features = []
     radar_images = []
-    for path in local_paths:
-        result = results.get(path)
+    t1 = time.time()
+
+    for i, path in enumerate(local_paths, 1):
+        result = _process_scan(
+            path, images_dir, zoom_lat, zoom_lon, zoom_km,
+            radar_site_lat, radar_site_lon, event_name, progress,
+        )
+        elapsed = time.time() - t1
+        print(f"    Scan {i}/{len(local_paths)} complete — {elapsed:.1f}s elapsed, {elapsed/i:.1f}s avg")
+        _p(f"  Rendered scan {i} of {len(local_paths)}...")
         if result is not None:
             features_dict, img_path = result
             radar_features.append(features_dict)
             radar_images.append(img_path)
 
+    print(f"  Total render time: {time.time() - t1:.1f}s for {len(local_paths)} scans")
     return radar_features, radar_images
 
 
@@ -344,6 +361,7 @@ def _write_outputs(
         "narrative": report.narrative,
         "warnings": report.warnings,
         "lsrs": report.lsrs,
+        "ncei_events": report.ncei_events,
         "radar_features": report.radar_features,
         "radar_images": report.radar_images,
         "feature_notes": report.feature_notes,
@@ -430,6 +448,17 @@ def run_pipeline(
 
     # Step 1: fetch LSRs
     lsrs = _fetch_lsrs(avail, zoom_lat, zoom_lon, lsr_search_km, start, end, warnings)
+    
+    # Step 1b: fetch NCEI storm events
+    
+    ncei_events = _fetch_ncei(
+        event_date=start.date(),
+        location_display_name=location,
+        progress=progress,
+    )
+    
+    event_label = geocoding._get_event_city(location)
+    
 
     # Step 2: process radar
     if avail.radar:
@@ -437,6 +466,7 @@ def run_pipeline(
             radar_site, start, end, max_radar_scans,
             images_dir, zoom_lat, zoom_lon, zoom_km,
             radar_site_lat, radar_site_lon,
+            event_name=str(event_label),
             progress=progress,
         )
     else:
@@ -450,6 +480,7 @@ def run_pipeline(
         location=location,
         warnings=warnings,
         lsrs=lsrs,
+        ncei_events=ncei_events,
         radar_features=radar_features,
         radar_images=radar_images,
         feature_notes=avail.notes,

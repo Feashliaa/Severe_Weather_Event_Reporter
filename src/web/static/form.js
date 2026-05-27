@@ -81,7 +81,7 @@ function selectLocation(result) {
     displayInput.value = result.label;
     latInput.value = result.y;
     lonInput.value = result.x;
-    resolvedHint.textContent = `✓ Selected: ${result.label}`;
+    resolvedHint.textContent = `Selected: ${result.label}`;
     resolvedHint.classList.remove('hidden');
     dropdown.classList.add('hidden');
 }
@@ -113,7 +113,17 @@ const ICON_RUNNING = `<svg width="14" height="14" viewBox="0 0 24 24" fill="curr
 
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(form));
+
+    const raw = Object.fromEntries(new FormData(form))
+
+
+    const data = {
+        ...raw,
+        zoom_km: parseFloat(raw.zoom_km) || 50.0,
+        max_radar_scans: parseInt(raw.max_radar_scans) || 8,
+        lsr_search_km: parseFloat(raw.lsr_search_km) || 75.0,
+    };
+
     submitBtn.disabled = true;
     submitBtn.innerHTML = ICON_GENERATING;
     statusDiv.classList.remove('hidden');

@@ -61,3 +61,28 @@ def get_timezone(lat: float, lon: float) -> str:
     """
     tz = _tz_finder.timezone_at(lat=lat, lng=lon)
     return tz or "UTC"
+
+def _parse_state_county(display_name: str) -> tuple[str | None, str | None]:
+    """Extract state and county from Nominatim display name.
+    
+    e.g. 'Greenfield, Adair County, Iowa, United States' 
+    → ('IOWA', 'ADAIR')
+    """
+    parts = [p.strip() for p in display_name.split(",")]
+    state = None
+    county = None
+    for part in parts:
+        if "United States" in part or "USA" in part:
+            continue
+        if "County" in part:
+            county = part.replace("County", "").strip().upper()
+        elif len(parts) >= 3 and part == parts[-2]:
+            state = part.strip().upper()
+    return state, county
+
+def _get_event_city(location_display_name: str) -> str | None:
+    """Extract just the city name from a Nominatim display name.
+    """
+    if not location_display_name:
+        return None
+    return location_display_name.split(",")[0].strip()

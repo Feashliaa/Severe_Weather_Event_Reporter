@@ -25,7 +25,7 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-nano-2026-03-17")
 # gemini-3.1-flash-lite-preview is better
 # but its not reliable as compared to gemini-2.5-flash
 # still going to use gemini-3.1 anyway cause goteem
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview") 
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite") 
 
 
 # External APIs

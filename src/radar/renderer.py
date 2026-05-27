@@ -86,43 +86,85 @@ def _patch_radar_location(
 def _build_figure(has_dual_pol: bool, proj):
     """Create the matplotlib figure and axes. Returns (fig, panel_axes, named_axes)."""
     if has_dual_pol:
-        fig, axes = plt.subplots(2, 2, figsize=(16, 14), dpi=110, subplot_kw={"projection": proj})
+        fig, axes = plt.subplots(2, 2, figsize=(16, 14), dpi=90, subplot_kw={"projection": proj})
         ax_refl, ax_vel = axes[0, 0], axes[0, 1]
         ax_cc, ax_sw = axes[1, 0], axes[1, 1]
         return fig, [ax_refl, ax_vel, ax_cc, ax_sw], (ax_refl, ax_vel, ax_cc, ax_sw)
     else:
-        fig, (ax_refl, ax_vel) = plt.subplots(1, 2, figsize=(14, 7), dpi=110, subplot_kw={"projection": proj})
+        fig, (ax_refl, ax_vel) = plt.subplots(1, 2, figsize=(14, 7), dpi=90, subplot_kw={"projection": proj})
         return fig, [ax_refl, ax_vel], (ax_refl, ax_vel, None, None)
 
 
 def _add_map_features(ax, extent: list[float], counties, states, city_records: list) -> None:
     """Add geographic overlays to a single axes."""
+    ax.set_facecolor("#1c2b3a")
     ax.add_feature(counties)
     ax.add_feature(states)
     for city in city_records:
         city_lon = float(city.geometry.x)  # type: ignore
         city_lat = float(city.geometry.y)  # type: ignore
         name = city.attributes.get("NAME", "")
-        ax.plot(city_lon, city_lat, "k.", markersize=5, transform=ccrs.PlateCarree(), zorder=5)
+        ax.plot(city_lon, city_lat, "w.", markersize=5, transform=ccrs.PlateCarree(), zorder=5)
         ax.text(
             city_lon, city_lat, f" {name}",
-            fontsize=8, fontweight="bold",
+            fontsize=8, fontweight="bold", color="white",
             transform=ccrs.PlateCarree(),
             verticalalignment="center", zorder=5,
-            path_effects=[patheffects.withStroke(linewidth=2.5, foreground="white")],
+            path_effects=[patheffects.withStroke(linewidth=2.5, foreground="#1c2b3a")],
         )
+        
+_COUNTIES = cfeature.NaturalEarthFeature(
+    category="cultural", name="admin_2_counties",
+    scale="10m", facecolor="none", edgecolor="#3a3a5c", linewidth=0.5,
+)
+_STATES = cfeature.NaturalEarthFeature(
+    category="cultural", name="admin_1_states_provinces_lines",
+    scale="50m", facecolor="none", edgecolor="#6a6a9a", linewidth=0.8,
+)
+
+_CITY_CACHE: dict[tuple, list] = {}
 
 
-def _load_city_records(extent: list[float]) -> list:
-    """Load and filter populated places within the map extent."""
-    cities_path = shpreader.natural_earth(resolution="10m", category="cultural", name="populated_places")
-    reader = shpreader.Reader(cities_path)
-    return [
-        city for city in reader.records()
-        if (extent[0] < float(city.geometry.x) < extent[1]  # type: ignore
-            and extent[2] < float(city.geometry.y) < extent[3]  # type: ignore
-            and int(city.attributes.get("POP_MAX", 0) or 0) > 1000)  # type: ignore
-    ]
+
+def _load_city_records(
+    extent: list[float],
+    force_lat: float | None = None,
+    force_lon: float | None = None,
+    force_label: str | None = None,
+) -> list:
+    """Load and filter populated places within the map extent. Cached by extent."""
+    key = tuple(round(x, 2) for x in extent)
+    
+    records = _CITY_CACHE.get(key)
+    if records is None:
+        cities_path = shpreader.natural_earth(
+            resolution="10m", 
+            category="cultural", 
+            name="populated_places")
+        
+        reader = shpreader.Reader(cities_path)
+        records = [
+            city for city in reader.records()
+            if (extent[0] < float(city.geometry.x) < extent[1]  # type: ignore
+                and extent[2] < float(city.geometry.y) < extent[3]  # type: ignore
+                and int(city.attributes.get("POP_MAX", 0) or 0) > 1000)  # type: ignore
+        ]
+        _CITY_CACHE[key] = records
+
+    # Always include the event location regardless of population
+    if force_lat is not None and force_lon is not None and force_label:
+        # Check it's not already labeled
+        existing_names = [c.attributes.get("NAME", "") for c in records]
+        if force_label not in existing_names:
+            # Create a simple namespace object that mimics a shapereader record
+            class _ForcedCity:
+                class geometry:
+                    x = force_lon
+                    y = force_lat
+                attributes = {"NAME": force_label, "POP_MAX": 0}
+            records = list(records) + [_ForcedCity()]
+
+    return records
 
 
 def render_radar_panel(
@@ -133,6 +175,7 @@ def render_radar_panel(
     zoom_km: float = 50.0,
     radar_site_lat: float | None = None,
     radar_site_lon: float | None = None,
+    event_label: str | None = None,
 ) -> Path:
     """Render a dual or quad-panel radar image with geographic overlay."""
     radar = pyart.io.read_nexrad_archive(str(level2_path))
@@ -187,21 +230,18 @@ def render_radar_panel(
             vmin=0, vmax=10, cmap="NWS_SPW", colorbar_label="Spectrum Width (m/s)",
             title=f"Spectrum Width ({radar.fixed_angle['data'][sw_sweep]:.1f}°)", **ppi_kwargs) # type: ignore[arg-type]
 
-    counties = cfeature.NaturalEarthFeature(
-        category="cultural", name="admin_2_counties",
-        scale="10m", facecolor="none", edgecolor="grey", linewidth=0.5,
-    )
-    states = cfeature.NaturalEarthFeature(
-        category="cultural", name="admin_1_states_provinces_lines",
-        scale="10m", facecolor="none", edgecolor="black", linewidth=0.8,
-    )
-    city_records = _load_city_records(extent)
+    city_records = _load_city_records(
+        extent,
+        force_lat=center_lat,
+        force_lon=center_lon,
+        force_label=event_label,
+        )
 
     for ax in panel_axes:
-        _add_map_features(ax, extent, counties, states, city_records)
+        _add_map_features(ax, extent, _COUNTIES, _STATES, city_records)
 
     fig.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, bbox_inches="tight", dpi=110)
+    fig.savefig(output_path, bbox_inches="tight", dpi=90)
     plt.close(fig)
     return output_path

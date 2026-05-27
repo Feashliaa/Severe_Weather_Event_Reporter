@@ -12,9 +12,10 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@4.0.0/dist/geosearch.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-geosearch@4.0.0/dist/geosearch.umd.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 
-<body class="bg-[#deeefb] text-slate-900 min-h-screen">
+<body class="bg-[#b0cce8] text-slate-900 min-h-screen">
 
     <div class="bg-[#003a8c] border-b-4 border-yellow-400">
         <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -101,6 +102,49 @@
                     </div>
                 </div>
 
+                <details class="border-2 border-slate-200">
+                    <summary
+                        class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#003a8c] cursor-pointer bg-slate-50 hover:bg-slate-100 select-none flex justify-between items-center">
+                        <span>Advanced Options</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-slate-400">
+                            <polygon points="4,8 20,8 12,18" />
+                        </svg>
+                    </summary>
+                    <div class="p-4 space-y-4 border-t border-slate-200">
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-1">
+                                    Map Zoom Radius
+                                    <span class="text-slate-500 font-normal normal-case">(km, default 50)</span>
+                                </label>
+                                <input name="zoom_km" type="number" value="50" min="25" max="200"
+                                    class="w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none text-sm">
+                                <p class="text-xs text-slate-500 mt-1">Increase for long-track tornadoes.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-1">
+                                    Radar Scans
+                                    <span class="text-slate-500 font-normal normal-case">(default 8)</span>
+                                </label>
+                                <input name="max_radar_scans" type="number" value="8" min="4" max="20"
+                                    class="w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none text-sm">
+                                <p class="text-xs text-slate-500 mt-1">More scans = slower but better coverage.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-[#003a8c] mb-1">
+                                    LSR Search Radius
+                                    <span class="text-slate-500 font-normal normal-case">(km, default 75)</span>
+                                </label>
+                                <input name="lsr_search_km" type="number" value="75" min="25" max="250"
+                                    class="w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none text-sm">
+                                <p class="text-xs text-slate-500 mt-1">Increase for long-track or widespread events.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </details>
+
                 <div class="pt-2">
                     <button type="submit" id="submit-btn"
                         class="w-full bg-[#003a8c] text-yellow-400 font-bold uppercase tracking-widest px-4 py-3 hover:bg-yellow-400 hover:text-[#003a8c] transition-colors border-2 border-[#003a8c]"
@@ -121,7 +165,7 @@
             </div>
         </div>
 
-        <p class="text-xs text-slate-600 mt-4 text-center">Reports take 1-3 minutes to generate.</p>
+        <p class="text-xs text-slate-600 mt-4 text-center">Reports take 3-5 minutes to generate.</p>
     </div>
 
     <script src="/static/form.js" defer></script>

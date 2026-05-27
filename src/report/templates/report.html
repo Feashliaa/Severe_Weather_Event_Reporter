@@ -38,9 +38,11 @@
         href="https://fonts.googleapis.com/css2?family=VT323&family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/static/report.css">
+
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 
-<body class="bg-[#deeefb] text-slate-900 min-h-screen">
+<body class="bg-[#b0cce8] text-slate-900 min-h-screen">
 
     <!-- "TV Banner" header -->
     <div class="bg-[#003a8c] border-b-4 border-yellow-400">
@@ -120,6 +122,15 @@
                         <circle cx="12" cy="10" r="3" />
                     </svg>
                     LSRS
+                </a>{% endif %}
+                {% if report.ncei_events %}<a href="#ncei" class="nav-tab">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round"
+                        style="display:inline;vertical-align:middle;margin-right:5px">
+                        <path d="M9 11l3 3L22 4" />
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                    </svg>
+                    NCEI
                 </a>{% endif %}
             </div>
         </div>
@@ -290,19 +301,19 @@
                                         rf.max_reflectivity_height_kft }}</td>
                                     <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">
                                         {{
-                                        rf.echo_top_18dbz_kft if rf.echo_top_18dbz_kft is not none else "—" }}</td>
+                                        rf.echo_top_18dbz_kft if rf.echo_top_18dbz_kft is not none else "-" }}</td>
                                     <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">
                                         {{
-                                        rf.echo_top_50dbz_kft if rf.echo_top_50dbz_kft is not none else "—" }}</td>
+                                        rf.echo_top_50dbz_kft if rf.echo_top_50dbz_kft is not none else "-" }}</td>
                                     <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">
                                         {{
                                         rf.max_inbound_velocity_kt if rf.max_inbound_velocity_kt is not none else
-                                        "—" }}
+                                        "-" }}
                                     </td>
                                     <td class="px-3 py-2 text-right font-mono text-slate-900 border border-slate-300">
                                         {{
                                         rf.max_outbound_velocity_kt if rf.max_outbound_velocity_kt is not none else
-                                        "—"
+                                        "-"
                                         }}
                                     </td>
                                 </tr>
@@ -398,6 +409,72 @@
                         </div>
                     </div>
                     {% endfor %}
+                </div>
+            </details>
+        </section>
+        {% endif %}
+
+        {% if report.ncei_events %}
+        <section id="ncei" class="gov-card mb-4 scroll-mt-20">
+            <details open>
+                <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
+                    <span>STORM SURVEY DATA (NCEI)</span>
+                    <span class="flex items-center gap-2">
+                        <span class="gov-header-count">{{ report.ncei_events | length }} RECORDS</span>
+                        <svg class="collapse-marker text-yellow-400" width="16" height="16" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <polygon points="4,8 20,8 12,18" />
+                        </svg>
+                    </span>
+                </summary>
+                <div class="p-3 md:p-5 space-y-2">
+                    {% for e in report.ncei_events %}
+                    {% set is_tornado = e.event_type == "Tornado" %}
+                    {% set is_hail = e.event_type == "Hail" %}
+                    <div
+                        class="border-2 {% if is_tornado %}border-red-600{% elif is_hail %}border-blue-600{% else %}border-slate-600{% endif %} bg-white flex">
+                        <div
+                            class="{% if is_tornado %}bg-red-600{% elif is_hail %}bg-blue-600{% else %}bg-slate-600{% endif %} w-3 shrink-0">
+                        </div>
+                        <div class="flex-1 p-3">
+                            <div class="flex items-baseline gap-2 flex-wrap">
+                                <span class="font-mono text-xs text-slate-700">{{ e.begin_time }}</span>
+                                <span
+                                    class="font-bold uppercase tracking-wide {% if is_tornado %}text-red-700{% elif is_hail %}text-blue-700{% else %}text-slate-700{% endif %}"
+                                    style="font-family: 'Oswald', sans-serif;">{{ e.event_type }}</span>
+                                {% if e.tor_f_scale %}<span class="font-mono font-bold text-red-900 bg-red-100 px-1">{{
+                                    e.tor_f_scale }}</span>{% endif %}
+                                {% if e.county %}<span class="text-sm text-slate-700">{{ e.county }} County</span>{%
+                                endif %}
+                            </div>
+                            <div class="flex gap-4 mt-1 flex-wrap">
+                                {% if e.deaths_direct or e.deaths_indirect %}
+                                <span class="text-xs font-bold text-red-700">{{ e.deaths_direct + e.deaths_indirect }}
+                                    deaths</span>
+                                {% endif %}
+                                {% if e.injuries_direct or e.injuries_indirect %}
+                                <span class="text-xs font-bold text-orange-700">{{ e.injuries_direct +
+                                    e.injuries_indirect }} injuries</span>
+                                {% endif %}
+                                {% if e.tor_length_mi %}<span class="text-xs text-slate-600">{{ e.tor_length_mi }} mi
+                                    path</span>{% endif %}
+                                {% if e.tor_width_yd %}<span class="text-xs text-slate-600">{{ e.tor_width_yd }} yd
+                                    wide</span>{% endif %}
+                                {% if e.damage_property %}
+                                <span class="text-xs text-slate-600">
+                                    ${{ "{:,.0f}".format(e.damage_property) }} property damage
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% if e.event_narrative %}
+                            <p class="text-xs text-slate-700 font-mono leading-relaxed mt-2">{{ e.event_narrative }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-500">
+                    Source: NOAA NCEI Storm Events Database - post-survey verified records
                 </div>
             </details>
         </section>

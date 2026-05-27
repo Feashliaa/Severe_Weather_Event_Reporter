@@ -41,6 +41,9 @@ class ReportRequest(BaseModel):
     start_time: str | None = None
     end_time: str | None = None
     tz_mode: str = "local"
+    zoom_km: float = 50.0 # standard
+    max_radar_scans: int = 8
+    lsr_search_km: float = 75.0
 
 
 def _run_pipeline_job(
@@ -53,6 +56,9 @@ def _run_pipeline_job(
     lat: float,
     lon: float,
     tz_name: str,
+    zoom_km: float = 50.0,
+    max_radar_scans: int = 8,
+    lsr_search_km: float = 75.0,
 )-> None:
     """Wrapper that runs the pipeline and updates job state"""
     
@@ -72,6 +78,9 @@ def _run_pipeline_job(
             zoom_lat=lat,
             zoom_lon=lon,
             local_timezone=tz_name,
+            zoom_km=zoom_km,
+            max_radar_scans=max_radar_scans,
+            lsr_search_km=lsr_search_km,
             progress=progress
         )
         _jobs[slug] = {"status": "done", "message" : "Complete", "error": None}
@@ -140,7 +149,17 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
     if (config.OUTPUT_DIR / slug / "report_data.json").exists():
         return RedirectResponse(url=f"/reports/{slug}/", status_code=303)
     
-    _jobs[slug] = {"status": "processing", "error": None}
+        # If already running, redirect to status page
+    if _jobs.get(slug, {}).get("status") == "processing":
+        return RedirectResponse(url=f"/reports/{slug}/status", status_code=303)
+
+    # Only one pipeline at a time
+    if any(j.get("status") == "processing" for j in _jobs.values()):
+        raise HTTPException(429, "Another report is currently generating. Please wait a few minutes and try again.")
+
+    _jobs[slug] = {"status": "processing", "message": "Starting pipeline...", "error": None}
+
+    
 
     background_tasks.add_task(
         _run_pipeline_job,
@@ -153,6 +172,9 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
         lat=lat,
         lon=lon,
         tz_name=tz_name,
+        zoom_km=req.zoom_km,
+        max_radar_scans=req.max_radar_scans,
+        lsr_search_km=req.lsr_search_km
     )
 
     return RedirectResponse(url=f"/reports/{slug}/status", status_code=303)
@@ -190,6 +212,7 @@ async def view_report(slug: str):
         narrative=data.get("narrative", ""),
         warnings=data.get("warnings", []),
         lsrs=data.get("lsrs", []),
+        ncei_events=data.get("ncei_events", []),
         radar_features=data.get("radar_features", []),
         radar_images=data.get("radar_images", []),
         feature_notes=data.get("feature_notes", []),
