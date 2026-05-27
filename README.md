@@ -79,42 +79,52 @@ Reports take about 3-5 minutes to generate (radar rendering is the bottleneck). 
 
 ## Project Structure
 
+```
 severe_weather_event_reporter/
 ├── src/
 │   ├── config.py                   # env vars, paths
+│   ├── event_config.py             # Event configuration loader
 │   ├── models.py                   # shared dataclasses
 │   ├── pipeline.py                 # main orchestrator
 │   ├── feature_gates.py            # date-based product availability
 │   │
 │   ├── data_sources/
-│   │   ├── geocoding.py            # Nominatim + timezone + state/county parsing
-│   │   ├── radar_locator.py        # nearest NEXRAD lookup
-│   │   ├── iem.py                  # IEM warnings + LSRs
-│   │   ├── nexrad.py               # NEXRAD Level II from S3
 │   │   ├── discovery.py            # auto-discover warnings at a point
-│   │   └── ncei.py                 # NCEI Storm Events CSV client
+│   │   ├── geocoding.py            # Nominatim + timezone + state/county parsing
+│   │   ├── iem.py                  # IEM warnings + LSRs
+│   │   ├── ncei.py                 # NCEI Storm Events CSV client
+│   │   ├── nexrad_stations.json    # JSON of nexrad stations
+│   │   ├── nexrad.py               # NEXRAD Level II from S3
+│   │   └── radar_locator.py        # nearest NEXRAD lookup
+│   │
+│   ├── llm/
+│   │   ├── base.py                 # Base runner/loader
+│   │   ├── anthropic_client.py     # anthropic setup
+│   │   ├── gemini_client.py        # gemini setup
+│   │   └── openai_client.py        # openai setup
 │   │
 │   ├── radar/
 │   │   ├── processor.py            # Py-ART feature extraction
 │   │   └── renderer.py             # Cartopy quad-panel rendering
 │   │
 │   ├── report/
-│   │   ├── builder.py              # EventReport dataclass + LLM prompt
-│   │   ├── templates/report.html
-│   │   └── static/                 # report.css, radar-loop.js, event-map.js
+│   │   └── builder.py              # EventReport dataclass + LLM prompt
+│   │   ├── templates/              # report.html
+│   │   └── static/                 # radar-loop.js, report.css, favicon.svg
 │   │
 │   └── web/
 │       ├── app.py                  # FastAPI routes + background jobs
 │       ├── templates/              # index.html, gallery.html, status.html
-│       └── static/form.js
+│       └── static/                 # form.js, event-map.js, radar-loop.js, report.css, favicon.svg
 │
 ├── scripts/
 │   ├── run_event.py                # CLI runner for JSON event configs
-│   └── download_ncei.py            # bulk NCEI CSV downloader
+│   └── download_ncei.py           # bulk NCEI CSV downloader
 │
 ├── events/                         # JSON event configs (for CLI use)
-├── .cache/                         # downloaded radar files + NCEI CSVs (gitignored)
+├── .cache/                         # downloaded radar + NCEI CSVs (gitignored)
 └── output/                         # generated reports (gitignored)
+```
 
 ## Tested Events
 
