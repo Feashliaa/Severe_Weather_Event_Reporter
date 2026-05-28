@@ -67,15 +67,26 @@ def _parse_state_county(display_name: str) -> tuple[str | None, str | None]:
 
     """
     parts = [p.strip() for p in display_name.split(",")]
+    # Filter out empty parts, "United States", "USA", and ZIP codes
+    cleaned = [
+        p for p in parts
+        if p
+        and "United States" not in p
+        and "USA" not in p
+        and not p.strip().isdigit()
+    ]
+    
     state = None
     county = None
-    for part in parts:
-        if "United States" in part or "USA" in part:
-            continue
-        if "County" in part:
-            county = part.replace("County", "").strip().upper()
-        elif len(parts) >= 3 and part == parts[-2]:
-            state = part.strip().upper()
+    
+    for part in cleaned:
+        if "County" in part or "Parish" in part or "Borough" in part:
+            county = part.replace("County", "").replace("Parish", "").replace("Borough", "").strip().upper()
+    
+    # State is the last remaining part after filtering
+    if cleaned:
+        state = cleaned[-1].strip().upper()
+    
     return state, county
 
 def _get_event_city(location_display_name: str) -> str | None:

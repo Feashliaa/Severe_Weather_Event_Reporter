@@ -38,22 +38,26 @@
                 <div id="spinner"
                     class="w-10 h-10 border-4 border-[#003a8c] border-t-yellow-400 rounded-full animate-spin"></div>
                 <p id="status-msg" class="text-slate-700 text-sm font-mono">
-                    Fetching warnings, radar data, and LSRs...
+                    Starting pipeline...
                 </p>
-                <p class="text-xs text-slate-500">This takes 3-5 minutes. The page will redirect automatically when
-                    ready.</p>
-            </div>
-        </div>
 
-        <div id="error-box" class="hidden w-full max-w-lg border-2 border-red-600 bg-white p-4">
-            <p class="font-bold text-red-700 uppercase text-sm mb-2" style="font-family: 'Oswald', sans-serif;">Pipeline
-                Failed</p>
-            <p id="error-msg" class="text-sm font-mono text-red-700"></p>
-            <a href="/"
-                class="inline-block mt-4 bg-[#003a8c] text-yellow-400 font-bold uppercase tracking-widest px-4 py-2 text-xs hover:bg-yellow-400 hover:text-[#003a8c] transition-colors"
-                style="font-family: 'Oswald', sans-serif;">
-                Try Again
-            </a>
+                <!-- Progress bar -->
+                <div class="w-full bg-slate-200 border border-slate-300 h-3">
+                    <div id="progress-bar" class="bg-[#003a8c] h-3 transition-all duration-1000" style="width: 0%">
+                    </div>
+                </div>
+                <p id="progress-label" class="text-xs text-slate-500 font-mono">0%</p>
+
+                <!-- Bottom estimate -->
+                <p id="time-estimate" class="text-xs text-slate-400">
+                    Estimating time...
+                </p>
+            </div>
+
+            <div id="error-box" class="hidden border-t-2 border-red-600 bg-red-50 px-6 py-4">
+                <p class="text-sm font-bold text-red-700 uppercase tracking-wider">Pipeline Failed</p>
+                <p id="error-msg" class="text-xs text-red-600 font-mono mt-1"></p>
+            </div>
         </div>
     </div>
 
@@ -62,12 +66,40 @@
         const statusMsg = document.getElementById("status-msg");
         const errorBox = document.getElementById("error-box");
         const errorMsg = document.getElementById("error-msg");
+        const progressBar = document.getElementById("progress-bar");
+        const progressLabel = document.getElementById("progress-label");
+        const timeEstimate = document.getElementById("time-estimate");
+
+        let startTime = Date.now();
+        let estimatedSeconds = null;
+
+        function updateProgress() {
+            if (!estimatedSeconds) return;
+            const elapsed = (Date.now() - startTime) / 1000;
+            const pct = Math.min(95, Math.round((elapsed / estimatedSeconds) * 100));
+            progressBar.style.width = pct + "%";
+            progressLabel.textContent = pct + "%";
+
+            const remaining = Math.max(0, Math.ceil((estimatedSeconds - elapsed) / 60 * 10) / 10);
+            if (remaining < 1) {
+                timeEstimate.textContent = `Less than a minute remaining...`;
+            } else {
+                timeEstimate.textContent = `~${Math.ceil(remaining)} minute${Math.ceil(remaining) !== 1 ? 's' : ''} remaining`;
+            }
+        }
+
+        // Tick every second
+        setInterval(updateProgress, 1000);
 
         async function poll() {
             try {
                 const res = await fetch(`/reports/${slug}/status.json`);
                 const data = await res.json();
+
                 if (data.status === "done") {
+                    progressBar.style.width = "100%";
+                    progressLabel.textContent = "100%";
+                    timeEstimate.textContent = "Complete — redirecting...";
                     window.location.href = `/reports/${slug}/`;
                 } else if (data.status === "failed") {
                     document.getElementById("spinner").classList.add("hidden");
@@ -75,6 +107,11 @@
                     errorBox.classList.remove("hidden");
                     errorMsg.textContent = data.error || "Unknown error";
                 } else {
+                    if (data.estimated_seconds && !estimatedSeconds) {
+                        estimatedSeconds = data.estimated_seconds;
+                        const mins = Math.ceil(estimatedSeconds / 60);
+                        timeEstimate.textContent = `Estimated ~${mins} minutes total`;
+                    }
                     if (data.message) {
                         statusMsg.textContent = data.message;
                     }

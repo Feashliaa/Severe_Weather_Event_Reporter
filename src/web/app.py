@@ -18,6 +18,7 @@ from src import config
 #from weasyprint import HTML as WeasyHTML
 
 import json
+import math
 
 app = FastAPI(title="Severe Weather Event Reporter")
 
@@ -64,6 +65,10 @@ def _run_pipeline_job(
     
     def progress(msg: str) -> None:
         _jobs[slug]["message"] = msg
+        
+    # Set estimated time as first message before pipeline starts
+    _jobs[slug]["message"] = f"Starting pipeline..."
+    _jobs[slug]["estimated_seconds"] = (max_radar_scans * 22) + 60
     
     try:
         run_pipeline(
@@ -157,9 +162,12 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
     if any(j.get("status") == "processing" for j in _jobs.values()):
         raise HTTPException(429, "Another report is currently generating. Please wait a few minutes and try again.")
 
-    _jobs[slug] = {"status": "processing", "message": "Starting pipeline...", "error": None}
-
-    
+    _jobs[slug] = {
+        "status": "processing",
+        "message": "Starting pipeline...",
+        "estimated_seconds": (req.max_radar_scans * 22) + 60,
+        "error": None,
+    }
 
     background_tasks.add_task(
         _run_pipeline_job,

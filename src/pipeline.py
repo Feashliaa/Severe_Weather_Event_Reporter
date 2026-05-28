@@ -3,9 +3,7 @@
 Orchestrates data fetching, radar processing, and LLM narrative generation.
 Each step is extracted into a helper function for testability and clarity.
 """
-import json
-import math
-import time
+import json, re, math, time
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
@@ -28,12 +26,28 @@ from typing import Callable
 # Step helpers
 # ---------------------------------------------------------------------------
 
+STATE_ABBR = {
+    'AL': 'ALABAMA', 'AK': 'ALASKA', 'AZ': 'ARIZONA', 'AR': 'ARKANSAS',
+    'CA': 'CALIFORNIA', 'CO': 'COLORADO', 'CT': 'CONNECTICUT', 'DE': 'DELAWARE',
+    'FL': 'FLORIDA', 'GA': 'GEORGIA', 'HI': 'HAWAII', 'ID': 'IDAHO',
+    'IL': 'ILLINOIS', 'IN': 'INDIANA', 'IA': 'IOWA', 'KS': 'KANSAS',
+    'KY': 'KENTUCKY', 'LA': 'LOUISIANA', 'ME': 'MAINE', 'MD': 'MARYLAND',
+    'MA': 'MASSACHUSETTS', 'MI': 'MICHIGAN', 'MN': 'MINNESOTA', 'MS': 'MISSISSIPPI',
+    'MO': 'MISSOURI', 'MT': 'MONTANA', 'NE': 'NEBRASKA', 'NV': 'NEVADA',
+    'NH': 'NEW HAMPSHIRE', 'NJ': 'NEW JERSEY', 'NM': 'NEW MEXICO', 'NY': 'NEW YORK',
+    'NC': 'NORTH CAROLINA', 'ND': 'NORTH DAKOTA', 'OH': 'OHIO', 'OK': 'OKLAHOMA',
+    'OR': 'OREGON', 'PA': 'PENNSYLVANIA', 'RI': 'RHODE ISLAND', 'SC': 'SOUTH CAROLINA',
+    'SD': 'SOUTH DAKOTA', 'TN': 'TENNESSEE', 'TX': 'TEXAS', 'UT': 'UTAH',
+    'VT': 'VERMONT', 'VA': 'VIRGINIA', 'WA': 'WASHINGTON', 'WV': 'WEST VIRGINIA',
+    'WI': 'WISCONSIN', 'WY': 'WYOMING',
+}
+
 def _geocode_location(
     location: str,
     zoom_lat: float | None,
     zoom_lon: float | None,
 ) -> tuple[float, float]:
-    """Return (lat, lon) — geocodes if not already provided."""
+    """Return (lat, lon) - geocodes if not already provided."""
     if zoom_lat is not None and zoom_lon is not None:
         return zoom_lat, zoom_lon
     print(f"  Geocoding location: {location}...")
@@ -85,7 +99,7 @@ def _select_radar(
             f"No NEXRAD data found within 230km of ({zoom_lat:.3f}, {zoom_lon:.3f}) for {start.date()}"
         )
     else:
-        # User-specified radar — look up its metadata
+        # User-specified radar - look up its metadata
         commissioned = None
         for s in radar_locator._load_stations():
             if s["icao"] == radar_site:
@@ -216,9 +230,26 @@ def _fetch_lsrs(
     return lsrs
 
 
+def _extract_warning_counties(warnings: list) -> list[tuple[str, str]]:
+    """Extract unique (state, county) pairs from warning location strings."""
+    results = []
+    seen = set()
+    for w in warnings:
+        locations = w.get("locations", "")
+        for match in re.finditer(r'([\w][\w\s]+?)\s*\[([A-Z]{2})\]', locations):
+            county = match.group(1).strip().upper()
+            abbr = match.group(2)
+            state = STATE_ABBR.get(abbr)
+            if state and (state, county) not in seen:
+                seen.add((state, county))
+                results.append((state, county))
+    return results
+
+
 def _fetch_ncei(
     event_date: date,
     location_display_name: str,
+    warnings: list | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> list[dict]:
     """Fetch NCEI Storm Events for the event date and location."""
@@ -226,23 +257,46 @@ def _fetch_ncei(
         print(msg)
         if progress: progress(msg)
 
-    state, county = geocoding._parse_state_county(location_display_name)
-    if not state:
-        _p("  Skipping NCEI lookup (could not determine state from location)")
-        return []
+    # Build list of (state, county) pairs to query
+    query_pairs: list[tuple[str, str]] = []
 
-    _p(f"  Fetching NCEI storm events for {state}, {county or 'all counties'} on {event_date}...")
-    try:
-        events = ncei.fetch_storm_events(
-            event_date=event_date,
-            state=state,
-            county=county,
-        )
-        _p(f"    Found {len(events)} NCEI storm events")
-        return events
-    except Exception as e:
-        _p(f"  NCEI fetch failed: {e}")
-        return []
+    # Add counties from warning locations
+    if warnings:
+        warning_counties = _extract_warning_counties(warnings)
+        query_pairs.extend(warning_counties)
+
+    # Fall back to geocoded location if no warning counties
+    if not query_pairs:
+        state, county = geocoding._parse_state_county(location_display_name)
+        if not state:
+            _p("  Skipping NCEI lookup (could not determine state from location)")
+            return []
+        query_pairs.append((state, county)) # type: ignore
+
+    _p(f"  Fetching NCEI storm events for {len(query_pairs)} counties on {event_date}...")
+
+    all_events = []
+    seen_keys: set[tuple] = set()
+
+    for state, county in query_pairs:
+        try:
+            events = ncei.fetch_storm_events(
+                event_date=event_date,
+                state=state,
+                county=county,
+            )
+            for e in events:
+                key = (e.get("begin_time"), e.get("state"), e.get("county"), e.get("event_type"))
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    all_events.append(e)
+        except Exception as e:
+            _p(f"  NCEI fetch failed for {state}/{county}: {e}")
+
+    _p(f"    Found {len(all_events)} NCEI storm events total")
+    return all_events
+    
+    
 
 def _process_scan(
     path: Path,
@@ -306,7 +360,7 @@ def _process_radar(
     key_scans = nexrad.pick_key_scans(all_scans, max_scans=max_radar_scans)
 
     t0 = time.time()
-    _p(f"  Downloading {len(key_scans)} of {len(all_scans)} scans...")
+    _p(f"  Downloading {len(all_scans)} scans...")
     local_paths = nexrad.download_scans(key_scans)
     print(f"    Download took {time.time() - t0:.1f}s")
 
@@ -320,7 +374,7 @@ def _process_radar(
             radar_site_lat, radar_site_lon, event_name, progress,
         )
         elapsed = time.time() - t1
-        print(f"    Scan {i}/{len(local_paths)} complete — {elapsed:.1f}s elapsed, {elapsed/i:.1f}s avg")
+        print(f"    Scan {i}/{len(local_paths)} complete - {elapsed:.1f}s elapsed, {elapsed/i:.1f}s avg")
         _p(f"  Rendered scan {i} of {len(local_paths)}...")
         if result is not None:
             features_dict, img_path = result
@@ -454,6 +508,7 @@ def run_pipeline(
     ncei_events = _fetch_ncei(
         event_date=start.date(),
         location_display_name=location,
+        warnings=warnings,
         progress=progress,
     )
     
