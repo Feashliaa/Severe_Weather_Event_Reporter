@@ -12,7 +12,7 @@ from jinja2 import Environment, FileSystemLoader
 from src.llm.base import get_client
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-
+EF_RANK = {'EF0': 0, 'EF1': 1, 'EF2': 2, 'EF3': 3, 'EF4': 4, 'EF5': 5, 'EFU': -1}
 
 @dataclass
 class EventReport:
@@ -28,6 +28,7 @@ class EventReport:
     radar_images: list[str] = field(default_factory=list)
     feature_notes: list[str] = field(default_factory=list)
     narrative: str = ""
+    outbreak_context: dict | None = None
 
 
 SYSTEM_PROMPT = """You are a meteorologist writing a post-event report for a severe weather event.
@@ -118,4 +119,61 @@ def build_html_string(report: EventReport, local_timezone: str = "UTC") -> str:
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=True)
     env.filters["fmt_time"] = lambda s: _format_time_with_local_tz(s, local_timezone)
     template = env.get_template("report.html")
-    return template.render(report=report)
+    return template.render(report=report, summary=compute_summary(report))
+
+def compute_summary(report: EventReport) -> dict:
+    """Compute impact summary stats for the report template."""
+    max_ef = None
+    max_ef_rank = -1
+    total_deaths = 0
+    total_injuries = 0
+    total_damage = 0.0
+    max_path = 0.0
+
+    for e in report.ncei_events:
+        if e.get('deaths_direct'):
+            total_deaths += e['deaths_direct']
+        if e.get('injuries_direct'):
+            total_injuries += e['injuries_direct']
+        if e.get('damage_property'):
+            total_damage += e['damage_property']
+        if e.get('tor_length_mi'):
+            try:
+                length = float(e['tor_length_mi'])
+                if length > max_path:
+                    max_path = length
+            except (ValueError, TypeError):
+                pass
+        if e.get('tor_f_scale'):
+            rank = EF_RANK.get(e['tor_f_scale'], -1)
+            if rank > max_ef_rank:
+                max_ef_rank = rank
+                max_ef = e['tor_f_scale']
+
+    radar_dbz = [
+        f['max_reflectivity_dbz'] for f in report.radar_features
+        if f.get('max_reflectivity_dbz') is not None
+    ]
+    radar_tops = [
+        f['echo_top_18dbz_kft'] for f in report.radar_features
+        if f.get('echo_top_18dbz_kft') is not None
+    ]
+    
+    # Suppress damage if clearly incomplete relative to event severity
+    if max_ef_rank >= 3 and total_damage < 100_000:
+        total_damage = None
+    elif total_damage < 10_000:
+        total_damage = None
+
+    return {
+        'max_ef': max_ef,
+        'total_deaths': total_deaths,
+        'total_injuries': total_injuries,
+        'total_damage': total_damage,
+        'max_path_mi': round(max_path, 1) if max_path > 0 else None,
+        'max_dbz': round(max(radar_dbz), 1) if radar_dbz else None,
+        'max_tops': round(max(radar_tops), 1) if radar_tops else None,
+        'warning_count': len(report.warnings),
+        'lsr_count': len(report.lsrs),
+        'outbreak_context': report.outbreak_context,
+    }

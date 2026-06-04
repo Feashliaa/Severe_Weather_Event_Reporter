@@ -11,7 +11,7 @@ from shapely.geometry import Point, shape
 from shapely.ops import unary_union
 
 from src import config
-from src.data_sources import discovery, geocoding, iem, nexrad, radar_locator, ncei
+from src.data_sources import discovery, geocoding, iem, nexrad, radar_locator, ncei, billion_dollar
 from src.feature_gates import feature_availability, FeatureAvailability
 from src.models import VTECEventRef
 from src.radar import processor as radar_processor
@@ -416,6 +416,7 @@ def _write_outputs(
         "warnings": report.warnings,
         "lsrs": report.lsrs,
         "ncei_events": report.ncei_events,
+        "outbreak_context": report.outbreak_context,
         "radar_features": report.radar_features,
         "radar_images": report.radar_images,
         "feature_notes": report.feature_notes,
@@ -512,6 +513,12 @@ def run_pipeline(
         progress=progress,
     )
     
+    # Step 1c: billion-dollar disaster context
+    event_date_obj = datetime.strptime(event_date, "%B %d, %Y").date()
+    outbreak_context = billion_dollar.lookup(event_date_obj)
+    if outbreak_context:
+        _progress(f"  Matched outbreak: {outbreak_context['name']}")
+    
     event_label = geocoding._get_event_city(location)
     
 
@@ -539,6 +546,7 @@ def run_pipeline(
         radar_features=radar_features,
         radar_images=radar_images,
         feature_notes=avail.notes,
+        outbreak_context=outbreak_context,
     )
 
     _progress("Generating narrative...")

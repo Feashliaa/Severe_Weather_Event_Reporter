@@ -221,6 +221,7 @@ async def view_report(slug: str):
         warnings=data.get("warnings", []),
         lsrs=data.get("lsrs", []),
         ncei_events=data.get("ncei_events", []),
+        outbreak_context=data.get("outbreak_context", None),
         radar_features=data.get("radar_features", []),
         radar_images=data.get("radar_images", []),
         feature_notes=data.get("feature_notes", []),

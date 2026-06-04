@@ -5,6 +5,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ report.event_name }} - Severe Weather Event Report</title>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=VT323&family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/report.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen@3.0.0/Control.FullScreen.css">
+    <script src="https://unpkg.com/leaflet.fullscreen@3.0.0/Control.FullScreen.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+</head>
+
+<body class="bg-[#b0cce8] text-slate-900 min-h-screen">
+
+    <!-- Feature Notes -->
     {% if report.feature_notes %}
     <section class="mb-4">
         <div class="border-2 border-amber-500 bg-amber-50 p-4">
@@ -31,23 +48,6 @@
         </div>
     </section>
     {% endif %}
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=VT323&family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="/static/report.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen@3.0.0/Control.FullScreen.css">
-    <script src="https://unpkg.com/leaflet.fullscreen@3.0.0/Control.FullScreen.js"></script>
-
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-</head>
-
-<body class="bg-[#b0cce8] text-slate-900 min-h-screen">
 
     <!-- "TV Banner" header -->
     <div class="bg-[#003a8c] border-b-4 border-yellow-400">
@@ -71,25 +71,6 @@
             </div>
         </div>
     </div>
-
-    {% set max_ef = namespace(val='') %}
-    {% set total_deaths = namespace(val=0) %}
-    {% set total_injuries = namespace(val=0) %}
-    {% set total_damage = namespace(val=0) %}
-    {% set max_path = namespace(val=0) %}
-    {% for e in report.ncei_events %}
-    {% if e.deaths_direct %}{% set total_deaths.val = total_deaths.val + e.deaths_direct %}{% endif %}
-    {% if e.injuries_direct %}{% set total_injuries.val = total_injuries.val + e.injuries_direct %}{% endif %}
-    {% if e.damage_property %}{% set total_damage.val = total_damage.val + e.damage_property %}{% endif %}
-    {% if e.tor_length_mi and e.tor_length_mi|float > max_path.val %}{% set max_path.val = e.tor_length_mi|float
-    %}{% endif %}
-    {% if e.tor_f_scale and e.tor_f_scale > max_ef.val %}{% set max_ef.val = e.tor_f_scale %}{% endif %}
-    {% endfor %}
-    {% set max_dbz = report.radar_features | map(attribute='max_reflectivity_dbz') | select('ne', None) | list | max
-    if report.radar_features else None %}
-    {% set max_tops = report.radar_features | map(attribute='echo_top_18dbz_kft') | select('ne', None) | list | max
-    if report.radar_features else None %}
-
 
     <!-- Sticky section nav -->
     <nav class="sticky top-0 z-40 bg-[#003a8c] border-b-2 border-yellow-400 shadow-md">
@@ -168,7 +149,7 @@
         </div>
     </nav>
 
-
+    <!-- Main Section -->
     <div class="max-w-5xl mx-auto px-3 md:px-4 py-4 md:py-6">
 
         <!-- Event title card - TWC style -->
@@ -189,7 +170,8 @@
             </div>
         </header>
 
-        <!-- Impact Summary Card -->
+        {% set s = summary %}
+
         <section class="gov-card mb-4">
             <details open>
                 <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
@@ -202,58 +184,58 @@
                 <div class="p-4 md:p-6">
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 
-                        {% if max_ef.val %}
+                        {% if s.max_ef %}
                         <div class="border border-[#facc15] rounded p-3 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">EF Rating</div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ max_ef.val }}</div>
+                                {{ s.max_ef }}</div>
                             <div class="text-slate-500 text-xs mt-1">confirmed</div>
                         </div>
                         {% endif %}
 
-                        {% if total_deaths.val > 0 %}
+                        {% if s.total_deaths > 0 %}
                         <div class="border border-[#facc15] rounded p-3 text-center">
                             <div class="text-red-600 text-xs uppercase tracking-wider font-bold mb-1">Fatalities</div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ total_deaths.val }}</div>
+                                {{ s.total_deaths }}</div>
                             <div class="text-slate-500 text-xs mt-1">direct deaths</div>
                         </div>
                         {% endif %}
 
-                        {% if total_injuries.val > 0 %}
+                        {% if s.total_injuries > 0 %}
                         <div class="border border-[#facc15] rounded p-3 text-center">
                             <div class="text-orange-600 text-xs uppercase tracking-wider font-bold mb-1">Injuries</div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ total_injuries.val }}</div>
+                                {{ s.total_injuries }}</div>
                             <div class="text-slate-500 text-xs mt-1">direct injuries</div>
                         </div>
                         {% endif %}
 
-                        {% if max_path.val > 0 %}
+                        {% if s.max_path_mi %}
                         <div class="border border-[#facc15] rounded p-3 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Path Length
                             </div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ "%.1f"|format(max_path.val) }}</div>
+                                {{ s.max_path_mi }}</div>
                             <div class="text-slate-500 text-xs mt-1">miles</div>
                         </div>
                         {% endif %}
 
-                        {% if max_dbz %}
+                        {% if s.max_dbz %}
                         <div class="border border-[#facc15] rounded p-3 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Max Reflectivity
                             </div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ max_dbz | round(1) }}</div>
+                                {{ s.max_dbz }}</div>
                             <div class="text-slate-500 text-xs mt-1">dBZ</div>
                         </div>
                         {% endif %}
 
-                        {% if max_tops %}
+                        {% if s.max_tops %}
                         <div class="border border-[#facc15] rounded p-3 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Echo Tops</div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ max_tops | round(1) }}</div>
+                                {{ s.max_tops }}</div>
                             <div class="text-slate-500 text-xs mt-1">kft (18 dBZ)</div>
                         </div>
                         {% endif %}
@@ -261,7 +243,7 @@
                         <div class="border border-[#facc15] rounded p-3 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Warnings</div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ report.warnings | length }}</div>
+                                {{ s.warning_count }}</div>
                             <div class="text-slate-500 text-xs mt-1">NWS issued</div>
                         </div>
 
@@ -269,19 +251,34 @@
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Storm Reports
                             </div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ report.lsrs | length }}</div>
+                                {{ s.lsr_count }}</div>
                             <div class="text-slate-500 text-xs mt-1">LSRs filed</div>
                         </div>
 
                     </div>
 
-                    {% if total_damage.val > 0 %}
-                    <div class="mt-3 rounded border border-[#facc15] p-3 text-center">
+                    {% if s.total_damage %}
+                    <div class="mt-3 bg-slate-50 rounded border border-[#facc15] p-3 text-center">
                         <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Property Damage
                         </div>
                         <div class="text-slate-900 text-2xl font-black" style="font-family: 'Oswald', sans-serif;">
-                            ${{ "{:,.0f}".format(total_damage.val) }}
+                            ${{ "{:,.0f}".format(s.total_damage) }}
                         </div>
+                    </div>
+                    {% endif %}
+
+
+                    {% if s.outbreak_context %}
+                    <div class="mt-3 bg-slate-50 rounded border border-[#facc15] p-3 text-center">
+                        <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Outbreak Context
+                        </div>
+                        <div class="text-slate-900 text-sm font-bold">{{ s.outbreak_context.name }}</div>
+                        <div class="text-slate-600 text-xs mt-1">
+                            ${{ "{:,.0f}".format(s.outbreak_context.cost_unadjusted * 1_000_000) }} total damage ·
+                            {{ s.outbreak_context.deaths }} deaths
+                        </div>
+                        <div class="text-slate-400 text-xs mt-1">Source: NOAA Billion-Dollar Disasters (discontinued
+                            2024)</div>
                     </div>
                     {% endif %}
 
