@@ -137,8 +137,6 @@ severe_weather_event_reporter/
 | Mayfield, KY tornado | December 10, 2021 | EF4, night event |
 | Rolling Fork, MS tornado | March 24, 2023 | EF4 |
 | Enderlin, ND tornado | June 20, 2025 | EF5, train derailment |
-| Enid, OK tornado | April 23, 2026 | EF4, recent live event |
-| Bogue Chitto, MS tornado | 2026 | Recent live event |
 
 ## Roadmap
 
