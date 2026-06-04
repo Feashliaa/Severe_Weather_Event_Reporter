@@ -20,6 +20,7 @@ searchInput.placeholder = 'e.g., Joplin, Missouri';
 searchInput.required = true;
 searchInput.autocomplete = 'off';
 searchInput.className = 'w-full border-2 border-slate-300 px-3 py-2 focus:border-[#003a8c] focus:outline-none';
+searchInput.name = 'location_input'
 searchContainer.appendChild(searchInput);
 
 const dropdown = document.createElement('div');
@@ -65,9 +66,10 @@ function renderDropdown(results) {
         return;
     }
 
-    results.forEach((r) => {
+    results.forEach((r, i) => {
         const item = document.createElement('button');
         item.type = 'button';
+        item.name = `location_button_${i}`;
         item.className = 'w-full text-left px-3 py-2 text-sm hover:bg-yellow-100 border-b border-slate-200 last:border-b-0';
         item.textContent = r.label;
         item.addEventListener('click', () => selectLocation(r));

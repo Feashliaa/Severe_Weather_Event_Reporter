@@ -7,7 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const lsrs = JSON.parse(container.dataset.lsrs || '[]');
     const ncei = JSON.parse(container.dataset.ncei || '[]');
 
-    const map = L.map('event-map', { zoomControl: true }).setView([39.0, -98.0], 9);
+    const map = L.map('event-map', {
+        zoomControl: true,
+        fullscreenControl: true, // Appends the button to the map
+        fullscreenControlOptions: {
+            position: 'topright'
+        }
+    }).setView([39.0, -98.0], 9);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '© OpenStreetMap © CARTO',
@@ -86,6 +92,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const beginLon = parseFloat(e.begin_lon);
         const endLat = parseFloat(e.end_lat);
         const endLon = parseFloat(e.end_lon);
+        const widthYards = parseFloat(e.tor_width_yd) || 0;
+        
 
         // Color by EF scale
         const efColors = {
@@ -93,11 +101,40 @@ document.addEventListener('DOMContentLoaded', () => {
             'EF3': '#b91c1c', 'EF4': '#3b0303', 'EF5': '#3b0a45',
             'EFU': '#94a3b8',
         };
-        const trackColor = efColors[e.tor_f_scale] || '#7f1d1d';
+        const color = efColors[e.tor_f_scale] || '#7f1d1d';
+
+
+
+        // width buffer
+
+        const midLat = (beginLat + endLat) / 2;
+        const widthMeters = widthYards * 0.9144; // Convert yards to meters
+        const halfWidthDegLat = (widthMeters / 111320) / 2; // Approximate conversion to degrees latitude
+        const halfWidthDegLon = halfWidthDegLat / Math.cos(midLat * Math.PI / 180); // Adjust for longitude
+        const angle = Math.atan2(endLat - beginLat, endLon - beginLon);
+        const perpLat = Math.cos(angle) * halfWidthDegLat;
+        const perpLon = Math.sin(angle) * halfWidthDegLon;
+
+        const corridor = [
+            [beginLat + perpLat, beginLon - perpLon],
+            [endLat + perpLat, endLon - perpLon],
+            [endLat - perpLat, endLon + perpLon],
+            [beginLat - perpLat, beginLon + perpLon],
+        ]
+
+        L.polygon(corridor, {
+            color: 'transparent',
+            fillColor: color,
+            fillOpacity: 0.3,
+            weight: 0,
+        }).addTo(map);
+
+
+        const weight = e.tor_f_scale === 'EF5' ? 6 : e.tor_f_scale === 'EF4' ? 5 : 3;
 
         L.polyline([[beginLat, beginLon], [endLat, endLon]], {
-            color: trackColor,
-            weight: e.tor_f_scale === 'EF5' ? 6 : e.tor_f_scale === 'EF4' ? 5 : 3,
+            color: color,
+            weight: weight,
             opacity: 0.9,
         }).bindPopup(`
             <b>${e.tor_f_scale || 'Tornado'} - ${e.county} County</b><br>
@@ -124,7 +161,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         map.fitBounds(finalBounds);
     }
-    else{
+    else {
         console.warn("No points found to calculate bounds")
     }
+
+    // Allow the map to expand completely when going into fullscreen mode
+    map.on('fullscreenchange', () => {
+        if (map.isFullscreen()) {
+            // Remove limits so the map can stretch to fill the screen dimensions
+            map.setMaxBounds(null);
+        } else if (finalBounds) {
+            // Re-apply original restrictions when exiting fullscreen
+            map.setMaxBounds(finalBounds);
+            map.fitBounds(finalBounds);
+        }
+    });
+
 });
