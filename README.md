@@ -179,21 +179,21 @@ TBD
 ## Resources
 
 **Primary data sources:**
-- NEXRAD Level II radar: `https://noaa-nexrad-level2.s3.amazonaws.com`
-- IEM Mesonet (warnings + LSRs): `https://mesonet.agron.iastate.edu`
-- NCEI Storm Events CSV: `https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/`
-- OSM Nominatim (geocoding): `https://nominatim.openstreetmap.org`
+- NEXRAD Level II radar: [noaa-nexrad-level2](https://noaa-nexrad-level2.s3.amazonaws.com)
+- IEM Mesonet (warnings + LSRs): [mesonet.agron.iastate.edu](https://mesonet.agron.iastate.edu)
+- NCEI Storm Events CSV: [ncei.noaa.gov](https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/)
+- OSM Nominatim (geocoding): [nominatim.openstreetmap.org](https://nominatim.openstreetmap.org)
 
 **Reference/lookup:**
-- NOAA Billion-Dollar Disasters (discontinued): `https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.nodc:0209268`
-- SPC severe weather GIS: `https://www.spc.noaa.gov/gis/svrgis/`
+- NOAA Billion-Dollar Disasters (discontinued): [ncei.noaa.gov](https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.nodc:0209268)
+- SPC severe weather GIS: [spc.noaa.gov](https://www.spc.noaa.gov/gis/svrgis/)
 
 **Frontend libraries:**
-- Leaflet: `https://leafletjs.com`
-- CartoDB basemaps: `https://carto.com/basemaps`
-- Tailwind CSS: `https://tailwindcss.com`
-- Oswald font: `https://fonts.google.com/specimen/Oswald`
+- Leaflet: [leafletjs.com](https://leafletjs.com)
+- CartoDB basemaps: [carto.com](https://carto.com/basemaps)
+- Tailwind CSS: [tailwindcss.com](https://tailwindcss.com)
+- Oswald font: [fonts.google.com](https://fonts.google.com/specimen/Oswald)
 
 **NWS/NOAA institutional:**
-- NEXRAD network info: `https://www.roc.noaa.gov/WSR88D/`
-- IEM VTEC archive: `https://mesonet.agron.iastate.edu/vtec/`
+- NEXRAD network info: [roc.noaa.gov](https://www.roc.noaa.gov/WSR88D/)
+- IEM VTEC archive: [mesonet.agron.iastate.edu/vtec](https://mesonet.agron.iastate.edu/vtec/)
