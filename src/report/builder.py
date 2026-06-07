@@ -1,11 +1,13 @@
 """Assembles the final HTML report from structured data + LLM narrative."""
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+from collections import defaultdict
 
+from PIL import report
 import markdown
 from jinja2 import Environment, FileSystemLoader
 
@@ -29,33 +31,76 @@ class EventReport:
     feature_notes: list[str] = field(default_factory=list)
     narrative: str = ""
     outbreak_context: dict | None = None
+    lead_time: dict | None = None
 
 
-SYSTEM_PROMPT = """You are a meteorologist writing a post-event report for a severe weather event.
+SYSTEM_PROMPT = """You are a meteorologist writing a post-event severe weather report.
 
 CRITICAL RULES:
-1.  Only reference values, times, and facts provided in the structured data below.
-2.  Do not invent radar values, casualty counts, or any other quantitative information.
-3.  Do not interpret radar imagery - use only the pre-extracted numeric features.
-4.  Cite warnings and LSRs by their timestamps when relevant.
-5.  Write in clear, professional prose suitable for a public-facing report.
-6.  If the data is incomplete or unclear, say so rather than speculating.
-7.  SYNTHESIZE radar data - describe TRENDS (intensification, weakening, core descent)
-    rather than listing every scan's values. The radar table is rendered separately
-    in the report; your job is to interpret it, not transcribe it.
-8.  Ignore notes about artifacts, capped values, or 'no field' - these are diagnostic
-    metadata, not findings to report.
-9.  Output is HTML, not markdown. Use <strong>, <em>, <ul>, <li> tags. Do not use **, *, or # for formatting.
+1. Only reference values, times, and facts from the structured data provided.
+2. Do not invent radar values, casualty counts, or any quantitative information.
+3. Do not interpret radar imagery — use only the pre-extracted numeric features.
+4. If data is incomplete or ambiguous, say so explicitly rather than speculating.
+5. Write in clear, professional prose suitable for a public-facing report.
+6. SYNTHESIZE radar data — describe TRENDS (intensification, weakening, core descent)
+   rather than listing every scan. The radar table renders separately; interpret it, don't transcribe it.
+7. Ignore metadata notes about artifacts, capped values, or diagnostic flags.
+8. Output HTML only. Use <h2>, <p>, <strong>, <ul>, <li>. No markdown, no **, no #.
+9. CONFIDENCE: If a value seems inconsistent with other data, note the uncertainty.
+   Example: "LSRs suggest EF3 damage though the NCEI survey was not yet available at time of writing."
+10. LEAD TIME: If lead time data is provided, include a dedicated paragraph in the
+    warnings section discussing warning effectiveness and lead time.
 
-Your output should be coherent narrative HTML (paragraphs, lists where appropriate),
-not a flat data dump. Structure it as: overview, environmental context (if provided),
-storm evolution timeline, warnings issued, impacts/LSRs, conclusion.
-"""
+Structure: overview → environmental context → storm evolution → warnings issued
+(include lead time discussion here) → impacts → conclusion."""
 
 
 def generate_narrative(report: EventReport) -> str:
     """Call the LLM to generate the narrative section."""
     client = get_client()
+
+    lead_time = report.lead_time
+    
+    lead_time_section = ""
+    if lead_time:
+        if lead_time['had_warning']:
+            lead_time_section = f"""
+    WARNING LEAD TIME:
+    The first tornado warning was issued at {lead_time['first_warning_utc']}, 
+    {lead_time['lead_time_minutes']} minutes BEFORE the highest-rated tornado touched down at {lead_time['first_touchdown_utc']}.
+    NWS average lead time is ~13 minutes. Discuss warning effectiveness in the warnings section.
+    """
+        else:
+            lead_time_section = f"""
+    WARNING LEAD TIME:
+    The highest-rated tornado touched down at {lead_time['first_touchdown_utc']}, 
+    {abs(lead_time['lead_time_minutes'])} minutes BEFORE the first tornado warning was issued at {lead_time['first_warning_utc']}.
+    This means there was NO advance warning for the most significant tornado. Note this in the warnings section.
+    """
+
+    outbreak_section = ""
+    if report.outbreak_context:
+        outbreak_section = f"""
+OUTBREAK CONTEXT (NOAA Billion-Dollar Disasters):
+This event was part of: {report.outbreak_context['name']}
+Total outbreak damage: ${report.outbreak_context['cost_unadjusted']}M (unadjusted)
+Total outbreak deaths: {report.outbreak_context['deaths']}
+Note: This is outbreak-level data, not individual tornado damage.
+"""
+
+    # Compute totals so LLM doesn't have to sum across county records
+    total_deaths = sum(e.get('deaths_direct', 0) or 0 for e in report.ncei_events)
+    total_injuries = sum(e.get('injuries_direct', 0) or 0 for e in report.ncei_events)
+    tornado_count = sum(1 for e in report.ncei_events if e.get('event_type') == 'Tornado')
+
+    computed_totals = f"""
+COMPUTED TOTALS (pre-summed across all NCEI county records — use these figures, do not re-sum):
+Total direct deaths: {total_deaths}
+Total direct injuries: {total_injuries}
+Total tornado records: {tornado_count}
+Note: NCEI records are split by county. The same tornado may appear as multiple records
+across adjacent counties. Do not report a single county's path length as the total track length.
+"""
 
     user_prompt = f"""Generate a post-event report narrative for the following event.
 
@@ -63,37 +108,27 @@ EVENT: {report.event_name}
 DATE: {report.event_date}
 LOCATION: {report.location}
 
-METADATA:
-{json.dumps(report.summary_metadata, indent=2, default=str)}
-
 WARNINGS ISSUED ({len(report.warnings)} total):
 {json.dumps(report.warnings, indent=2, default=str)}
 
 LOCAL STORM REPORTS ({len(report.lsrs)} total):
 {json.dumps(report.lsrs, indent=2, default=str)}
 
-NCEI STORM EVENTS ({len(report.ncei_events)} records - post-survey verified data):
-These are authoritative NWS post-storm survey records. When available, prefer these
-over LSR data for EF ratings, path dimensions, casualties, and damage estimates.
-
+NCEI STORM EVENTS ({len(report.ncei_events)} records — post-survey verified):
+Prefer these over LSRs for EF ratings, path dimensions, casualties, and damage estimates.
 {json.dumps(report.ncei_events, indent=2, default=str)}
 
-RADAR FEATURES (extracted numerically from Level II volume scans):
-Each entry is one volume scan. Fields: max reflectivity (dBZ), height of max
-reflectivity (thousands of feet AGL), echo tops at 18 dBZ and 50 dBZ thresholds
-(thousands of feet), max inbound/outbound velocities (knots).
-
+RADAR FEATURES (extracted from Level II volume scans):
+Fields: timestamp, max reflectivity (dBZ), height of max reflectivity (kft AGL),
+echo tops at 18/50 dBZ (kft), max inbound/outbound velocities (knots).
+Interpret trends: rising echo tops = updraft strengthening, high-reflectivity core
+descent = large hail signature, strong velocity couplet = mesocyclone rotation.
 {json.dumps(report.radar_features, indent=2, default=str)}
+{lead_time_section}
+{outbreak_section}
+Write the narrative HTML now. Cite specific timestamps and values. Only use data above."""
 
-Write the narrative HTML now. Use the radar features to describe storm
-evolution - e.g., updraft strengthening (rising echo tops), high-reflectivity
-core descent (suggests large hail), strong velocity couplets (suggests rotation).
-Cite specific timestamps and values. Remember: only use the data above."""
-
-    
     raw = client.generate(SYSTEM_PROMPT, user_prompt, max_tokens=8192)
-    
-    # LLM may emit markdown; convert to HTML for clean rendering
     return markdown.markdown(raw, extensions=["extra", "sane_lists"])
 
 
@@ -121,6 +156,79 @@ def build_html_string(report: EventReport, local_timezone: str = "UTC") -> str:
     template = env.get_template("report.html")
     return template.render(report=report, summary=compute_summary(report))
 
+def compute_lead_time(warnings: list, ncei_events: list, lsrs: list, local_timezone: str = "UTC") -> dict | None:
+    from zoneinfo import ZoneInfo
+
+    tornado_warnings = [
+        w for w in warnings
+        if w.get("phenomena") == "TO" and w.get("significance") == "W"
+    ]
+    if not tornado_warnings:
+        return None
+
+    first_warning_str = min(
+        w["issued_at"] for w in tornado_warnings if w.get("issued_at")
+    )
+    try:
+        first_warning = datetime.fromisoformat(first_warning_str.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+    local_tz = ZoneInfo(local_timezone)
+
+    # Find highest EF-rated tornado
+    ef_rank = {'EF0': 0, 'EF1': 1, 'EF2': 2, 'EF3': 3, 'EF4': 4, 'EF5': 5, 'EFU': -1}
+    best_tornado = max(
+        (e for e in ncei_events if e.get('event_type') == 'Tornado'),
+        key=lambda e: ef_rank.get(e.get('tor_f_scale', ''), -1),
+        default=None
+    )
+
+    if best_tornado and best_tornado.get('begin_time'):
+        dt = _parse_ncei_dt(best_tornado['begin_time'])
+        if dt:
+            dt_utc = dt.replace(tzinfo=local_tz).astimezone(ZoneInfo('UTC'))
+            lead_minutes = (dt_utc - first_warning).total_seconds() / 60
+            return {
+                "lead_time_minutes": round(lead_minutes),
+                "first_warning_utc": first_warning_str,
+                "first_touchdown_utc": dt_utc.isoformat(),
+                "had_warning": lead_minutes > 0,
+            }
+
+    # Fall back to LSRs if no NCEI tornado records
+    for l in lsrs:
+        if l.get("event") == "TORNADO" and l.get("time"):
+            try:
+                dt = datetime.fromisoformat(l["time"].replace("Z", "+00:00"))
+                lead_minutes = (dt - first_warning).total_seconds() / 60
+                return {
+                    "lead_time_minutes": round(lead_minutes),
+                    "first_warning_utc": first_warning_str,
+                    "first_touchdown_utc": dt.isoformat(),
+                    "had_warning": lead_minutes > 0,
+                }
+            except Exception:
+                pass
+
+    return None
+    
+def _parse_ncei_dt(value: str) -> datetime | None:
+    """Parse NCEI datetime strings."""
+    if not value:
+        return None
+    for fmt in (
+        "%d-%b-%y %H:%M:%S",
+        "%d-%b-%Y %H:%M:%S",
+        "%m/%d/%Y %H:%M",
+        "%m/%d/%Y %H:%M:%S",
+    ):
+        try:
+            return datetime.strptime(value.strip(), fmt)
+        except ValueError:
+            continue
+    return None
+                    
 def compute_summary(report: EventReport) -> dict:
     """Compute impact summary stats for the report template."""
     max_ef = None
@@ -129,12 +237,11 @@ def compute_summary(report: EventReport) -> dict:
     total_injuries = 0
     total_damage = 0.0
     max_path = 0.0
+    
+    total_deaths = sum(e.get('deaths_direct', 0) or 0 for e in report.ncei_events)
+    total_injuries = sum(e.get('injuries_direct', 0) or 0 for e in report.ncei_events)
 
     for e in report.ncei_events:
-        if e.get('deaths_direct'):
-            total_deaths += e['deaths_direct']
-        if e.get('injuries_direct'):
-            total_injuries += e['injuries_direct']
         if e.get('damage_property'):
             total_damage += e['damage_property']
         if e.get('tor_length_mi'):
@@ -176,4 +283,5 @@ def compute_summary(report: EventReport) -> dict:
         'warning_count': len(report.warnings),
         'lsr_count': len(report.lsrs),
         'outbreak_context': report.outbreak_context,
+        'lead_time': report.lead_time,
     }

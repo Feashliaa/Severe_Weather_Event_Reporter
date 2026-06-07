@@ -16,7 +16,7 @@ from src.feature_gates import feature_availability, FeatureAvailability
 from src.models import VTECEventRef
 from src.radar import processor as radar_processor
 from src.radar import renderer as radar_renderer
-from src.report.builder import EventReport, generate_narrative
+from src.report.builder import EventReport, generate_narrative, compute_lead_time
 
 
 from typing import Callable
@@ -420,6 +420,7 @@ def _write_outputs(
         "radar_features": report.radar_features,
         "radar_images": report.radar_images,
         "feature_notes": report.feature_notes,
+        "lead_time": report.lead_time,
     }
     (event_output_dir / "report_data.json").write_text(
         json.dumps(report_data, indent=2, default=str)
@@ -534,7 +535,16 @@ def run_pipeline(
     else:
         print("  Skipping radar (no coverage for this event)")
         radar_features, radar_images = [], []
-
+        
+    
+    # Step 2b: compute lead time if possible
+    lead_time = compute_lead_time(warnings, ncei_events, lsrs, local_timezone=local_timezone)
+    
+    if lead_time:
+        _progress(f"  Computed lead time: {lead_time['lead_time_minutes']} minutes before event start")
+    else:
+        _progress("  Could not compute lead time (missing or insufficient data)")
+        
     # Step 3: assemble report + generate narrative
     report = EventReport(
         event_name=event_name,
@@ -547,6 +557,7 @@ def run_pipeline(
         radar_images=radar_images,
         feature_notes=avail.notes,
         outbreak_context=outbreak_context,
+        lead_time=lead_time,
     )
 
     _progress("Generating narrative...")

@@ -167,6 +167,8 @@ def fetch_storm_events(
                 "tor_f_scale": row.get("TOR_F_SCALE"),
                 "tor_length_mi": row.get("TOR_LENGTH"),
                 "tor_width_yd": row.get("TOR_WIDTH"),
+                "episode_id": row.get("EPISODE_ID"),
+                "event_id": row.get("EVENT_ID"),
                 "deaths_direct": int(row.get("DEATHS_DIRECT") or 0),
                 "deaths_indirect": int(row.get("DEATHS_INDIRECT") or 0),
                 "injuries_direct": int(row.get("INJURIES_DIRECT") or 0),

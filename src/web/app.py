@@ -222,6 +222,7 @@ async def view_report(slug: str):
         lsrs=data.get("lsrs", []),
         ncei_events=data.get("ncei_events", []),
         outbreak_context=data.get("outbreak_context", None),
+        lead_time=data.get("lead_time", None),
         radar_features=data.get("radar_features", []),
         radar_images=data.get("radar_images", []),
         feature_notes=data.get("feature_notes", []),
@@ -258,38 +259,3 @@ async def report_status_json(slug: str):
     if job is None:
         raise HTTPException(404, "Job not found")
     return job
-
-# This will be used if I add WeasyPDF - The print screen is good enough at the moment
-# @app.get("/reports/{slug}/pdf")
-# async def export_pdf(slug: str):
-#     """Exports the HTML to a PDF"""
-#     data_path = config.OUTPUT_DIR / slug / "report_data.json"
-    
-#     if not data_path.exists():
-#         raise HTTPException(404, f"Report not found: {slug}")
-    
-#     data = json.loads(data_path.read_text())
-    
-#     report = EventReport(
-#         event_name=data["event_name"],
-#         event_date=data["event_date"],
-#         location=data["location"],
-#         narrative=data.get("narrative", ""),
-#         warnings=data.get("warnings", []),
-#         lsrs=data.get("lsrs", []),
-#         radar_features=data.get("radar_features", []),
-#         radar_images=data.get("radar_images", []),
-#         feature_notes=data.get("feature_notes", []),
-#     )
-    
-#     html_string = build_html_string(report, local_timezone=data.get("local_timezone", "UTC"))
-    
-#     base_url = f"http://localhost:{config.PORT}"
-#     pdf_bytes = WeasyHTML(string=html_string, base_url=base_url).write_pdf()
-    
-#     filename = f"{slug}.pdf"
-#     return Response(
-#         content=pdf_bytes,
-#         media_type="application/pdf",
-#         headers={"Content-Disposition": f"attachment; filename={filename}"}   
-#     ) 

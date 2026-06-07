@@ -193,6 +193,27 @@
                         </div>
                         {% endif %}
 
+                        {% if s.lead_time %}
+                        <div class="border border-[#facc15] rounded p-3 text-center">
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Warning Lead
+                                Time</div>
+                            <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
+                                {% if s.lead_time.had_warning %}
+                                {{ s.lead_time.lead_time_minutes }} min
+                                {% else %}
+                                None
+                                {% endif %}
+                            </div>
+                            <div class="text-slate-500 text-xs mt-1">
+                                {% if s.lead_time.had_warning %}
+                                before touchdown
+                                {% else %}
+                                tornado preceded warning
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+
                         {% if s.total_deaths > 0 %}
                         <div class="border border-[#facc15] rounded p-3 text-center">
                             <div class="text-red-600 text-xs uppercase tracking-wider font-bold mb-1">Fatalities</div>
@@ -217,7 +238,7 @@
                             </div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
                                 {{ s.max_path_mi }}</div>
-                            <div class="text-slate-500 text-xs mt-1">miles</div>
+                            <div class="text-slate-500 text-xs mt-1">mi (longest county segment)</div>
                         </div>
                         {% endif %}
 
