@@ -180,7 +180,8 @@ TBD
 
 **Primary data sources:**
 - NEXRAD Level II radar: [noaa-nexrad-level2](https://noaa-nexrad-level2.s3.amazonaws.com)
-- IEM Mesonet (warnings + LSRs): [mesonet.agron.iastate.edu](https://mesonet.agron.iastate.edu)
+- IEM Mesonet (warnings + LSRs + soundings): [mesonet.agron.iastate.edu](https://mesonet.agron.iastate.edu)
+- University of Wyoming (soundings): [University of Wymoing](https://weather.uwyo.edu/upperair/sounding.shtml)
 - NCEI Storm Events CSV: [ncei.noaa.gov](https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/)
 - OSM Nominatim (geocoding): [nominatim.openstreetmap.org](https://nominatim.openstreetmap.org)
 
