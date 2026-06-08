@@ -199,6 +199,35 @@ async def gallery(request: Request):
         ):
             try:
                 data = json.loads(manifest_path.read_text())
+
+                # Enrich with summary data from report_data.json
+                report_data_path = manifest_path.parent / "report_data.json"
+                if report_data_path.exists():
+                    rdata = json.loads(report_data_path.read_text())
+                    ncei = rdata.get("ncei_events", [])
+                    radar = rdata.get("radar_features", [])
+
+                    # Max EF rating
+                    ef_rank = {'EF0':0,'EF1':1,'EF2':2,'EF3':3,'EF4':4,'EF5':5,'EFU':-1}
+                    max_ef = None
+                    max_rank = -1
+                    for e in ncei:
+                        r = ef_rank.get(e.get('tor_f_scale',''), -1)
+                        if r > max_rank:
+                            max_rank = r
+                            max_ef = e.get('tor_f_scale')
+
+                    # Total deaths
+                    total_deaths = sum(e.get('deaths_direct', 0) or 0 for e in ncei)
+
+                    # Max dBZ
+                    dbz_vals = [f['max_reflectivity_dbz'] for f in radar if f.get('max_reflectivity_dbz')]
+                    max_dbz = round(max(dbz_vals), 1) if dbz_vals else None
+
+                    data['max_ef'] = max_ef
+                    data['total_deaths'] = total_deaths
+                    data['max_dbz'] = max_dbz
+
                 reports.append(data)
             except (json.JSONDecodeError, OSError):
                 continue
@@ -221,6 +250,8 @@ async def view_report(slug: str):
         warnings=data.get("warnings", []),
         lsrs=data.get("lsrs", []),
         ncei_events=data.get("ncei_events", []),
+        sounding_indices=data.get("sounding_indices", {}),
+        sounding_image=data.get("sounding_image", None),
         outbreak_context=data.get("outbreak_context", None),
         lead_time=data.get("lead_time", None),
         radar_features=data.get("radar_features", []),

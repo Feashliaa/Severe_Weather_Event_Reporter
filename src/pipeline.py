@@ -11,7 +11,7 @@ from shapely.geometry import Point, shape
 from shapely.ops import unary_union
 
 from src import config
-from src.data_sources import discovery, geocoding, iem, nexrad, radar_locator, ncei, billion_dollar
+from src.data_sources import discovery, geocoding, iem, nexrad, radar_locator, ncei, billion_dollar, sounding
 from src.feature_gates import feature_availability, FeatureAvailability
 from src.models import VTECEventRef
 from src.radar import processor as radar_processor
@@ -416,6 +416,8 @@ def _write_outputs(
         "warnings": report.warnings,
         "lsrs": report.lsrs,
         "ncei_events": report.ncei_events,
+        "sounding_indices": report.sounding_indices,
+        "sounding_image": report.sounding_image,
         "outbreak_context": report.outbreak_context,
         "radar_features": report.radar_features,
         "radar_images": report.radar_images,
@@ -514,7 +516,24 @@ def run_pipeline(
         progress=progress,
     )
     
-    # Step 1c: billion-dollar disaster context
+    # Step 1c: fetch pre-event sounding data
+    sounding_data = None
+    sounding_indices = {}
+    sounding_image = None
+    
+    if avail.radar:
+        raw_sounding = sounding.fetch_sounding(zoom_lat, zoom_lon, start)
+        if raw_sounding:
+            sounding_indices = sounding.compute_indices(raw_sounding)
+            sounding_img_path = images_dir / "sounding_skewt.png"
+            result = sounding.render_skewt(raw_sounding, sounding_img_path)
+            if result:
+                sounding_image = "images/sounding_skewt.png"
+            if sounding_indices:
+                _progress(f"  Sounding: CAPE={sounding_indices.get('cape_jkg')} J/kg, "
+                     f"Shear={sounding_indices.get('bulk_shear_06km_kt')} kt")
+    
+    # Step 1d: billion-dollar disaster context
     event_date_obj = datetime.strptime(event_date, "%B %d, %Y").date()
     outbreak_context = billion_dollar.lookup(event_date_obj)
     if outbreak_context:
@@ -553,6 +572,8 @@ def run_pipeline(
         warnings=warnings,
         lsrs=lsrs,
         ncei_events=ncei_events,
+        sounding_indices=sounding_indices,
+        sounding_image=sounding_image,
         radar_features=radar_features,
         radar_images=radar_images,
         feature_notes=avail.notes,

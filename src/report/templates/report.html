@@ -76,6 +76,14 @@
     <nav class="sticky top-0 z-40 bg-[#003a8c] border-b-2 border-yellow-400 shadow-md">
         <div class="max-w-5xl mx-auto px-2 md:px-4">
             <div class="flex overflow-x-auto -mx-2 px-2">
+                {% if report.sounding_image %}<a href="#sounding" class="nav-tab">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round"
+                        style="display:inline;vertical-align:middle;margin-right:5px">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                    SOUNDING
+                </a>{% endif %}
                 <a href="#narrative" class="nav-tab">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round"
@@ -167,6 +175,10 @@
                     style="font-family: 'Oswald', sans-serif;">
                     {{ report.event_date }}
                 </p>
+                <p class="text-white mt-4">
+                    The event narrative is AI-generated from structured meteorological data and may contain errors.
+                    Verify critical facts against the NCEI, NWS, and LSR data sections below.
+                </p>
             </div>
         </header>
 
@@ -197,20 +209,19 @@
                         <div class="border border-[#facc15] rounded p-3 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Warning Lead
                                 Time</div>
+                            {% if s.lead_time.data_quality %}
+                            <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">
+                                N/A</div>
+                            <div class="text-slate-500 text-xs mt-1">data quality uncertain</div>
+                            {% elif s.lead_time.had_warning %}
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {% if s.lead_time.had_warning %}
-                                {{ s.lead_time.lead_time_minutes }} min
-                                {% else %}
-                                None
-                                {% endif %}
-                            </div>
-                            <div class="text-slate-500 text-xs mt-1">
-                                {% if s.lead_time.had_warning %}
-                                before touchdown
-                                {% else %}
-                                tornado preceded warning
-                                {% endif %}
-                            </div>
+                                {{ s.lead_time.lead_time_minutes }} min</div>
+                            <div class="text-slate-500 text-xs mt-1">before touchdown</div>
+                            {% else %}
+                            <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
+                                None</div>
+                            <div class="text-slate-500 text-xs mt-1">tornado preceded warning</div>
+                            {% endif %}
                         </div>
                         {% endif %}
 
@@ -285,6 +296,7 @@
                         <div class="text-slate-900 text-2xl font-black" style="font-family: 'Oswald', sans-serif;">
                             ${{ "{:,.0f}".format(s.total_damage) }}
                         </div>
+                        <div class="text-slate-500 text-xs mt-1">Total NCEI Estimated Damage</div>
                     </div>
                     {% endif %}
 
@@ -306,6 +318,89 @@
                 </div>
             </details>
         </section>
+
+        {% if report.sounding_image %}
+        <section id="sounding" class="gov-card mb-4 scroll-mt-20">
+            <details open>
+                <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
+                    <span>PRE-EVENT SOUNDING</span>
+                    <span class="flex items-center gap-2">
+                        {% if report.sounding_indices %}
+                        <span class="gov-header-count">{{ report.sounding_indices.station }} {{
+                            report.sounding_indices.valid[:10] }}</span>
+                        {% endif %}
+                        <svg class="collapse-marker text-yellow-400" width="16" height="16" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <polygon points="4,8 20,8 12,18" />
+                        </svg>
+                    </span>
+                </summary>
+                <div class="p-5 md:p-7">
+                    <img src="{{ report.sounding_image }}" alt="Pre-event sounding"
+                        class="w-full max-w-2xl mx-auto block cursor-zoom-in"
+                        data-lightbox-src="{{ report.sounding_image }}" data-lightbox-caption="Pre-event Sounding - 
+                        {{ report.sounding_indices.station if report.sounding_indices else '' }} 
+                         {{ report.sounding_indices.valid[:10] if report.sounding_indices else '' }}">
+                    {% if report.sounding_indices %}
+                    <div class="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {% set si = report.sounding_indices %}
+                        {% if si.cape_jkg is not none %}
+                        <div class="border border-[#facc15] rounded p-2 text-center">
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">CAPE</div>
+                            <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
+                                si.cape_jkg }}</div>
+                            <div class="text-slate-500 text-xs">J/kg</div>
+                        </div>
+                        {% endif %}
+                        {% if si.cin_jkg is not none %}
+                        <div class="border border-[#facc15] rounded p-2 text-center">
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">CIN</div>
+                            <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
+                                si.cin_jkg }}</div>
+                            <div class="text-slate-500 text-xs">J/kg</div>
+                        </div>
+                        {% endif %}
+                        {% if si.bulk_shear_06km_kt is not none %}
+                        <div class="border border-[#facc15] rounded p-2 text-center">
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">0-6km Shear</div>
+                            <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
+                                si.bulk_shear_06km_kt }}</div>
+                            <div class="text-slate-500 text-xs">knots</div>
+                        </div>
+                        {% endif %}
+                        {% if si.sfc_temp_c is not none %}
+                        <div class="border border-[#facc15] rounded p-2 text-center">
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">Sfc Temp</div>
+                            <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
+                                si.sfc_temp_c }}</div>
+                            <div class="text-slate-500 text-xs">°C</div>
+                        </div>
+                        {% endif %}
+                        {% if si.sfc_dewpoint_c is not none %}
+                        <div class="border border-[#facc15] rounded p-2 text-center">
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">Sfc Dewpoint</div>
+                            <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
+                                si.sfc_dewpoint_c }}</div>
+                            <div class="text-slate-500 text-xs">°C</div>
+                        </div>
+                        {% endif %}
+                        {% if si.sfc_pressure_hpa is not none %}
+                        <div class="border border-[#facc15] rounded p-2 text-center">
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">Sfc Pressure</div>
+                            <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
+                                si.sfc_pressure_hpa }}</div>
+                            <div class="text-slate-500 text-xs">hPa</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    <p class="text-xs text-slate-500 mt-3">Upper air sounding from {{ report.sounding_indices.station if
+                        report.sounding_indices else 'nearest station' }} - nearest pre-event balloon launch. Source:
+                        IEM RAOB Archive.</p>
+                </div>
+            </details>
+        </section>
+        {% endif %}
 
         <!-- Narrative card - .gov style document -->
         <section id="narrative" class="gov-card mb-4 scroll-mt-20">
@@ -663,6 +758,10 @@
                 <span class="font-bold uppercase tracking-widest">Severe Weather Event Reporter</span>
                 <span class="text-yellow-400 font-mono">DATA: NWS / IEM / NOAA NEXRAD</span>
             </div>
+            <p class="text-xs text-white-500 mt-2 text-center">
+                The event narrative is AI-generated from structured meteorological data and may contain errors.
+                Verify critical facts against the NCEI, NWS, and LSR data sections above.
+            </p>
         </footer>
     </div>
 

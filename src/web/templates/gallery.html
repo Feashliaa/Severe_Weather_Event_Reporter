@@ -53,12 +53,32 @@
                     </span>
                 </div>
                 <div class="p-4">
-                    <h2 class="text-lg font-bold text-[#003a8c] uppercase tracking-tight"
-                        style="font-family: 'Oswald', sans-serif;">
-                        {{ r.event_name }}
-                    </h2>
+                    <div class="flex items-start justify-between gap-2">
+                        <h2 class="text-lg font-bold text-[#003a8c] uppercase tracking-tight"
+                            style="font-family: 'Oswald', sans-serif;">
+                            {{ r.event_name }}
+                        </h2>
+                        {% if r.max_ef %}
+                        <span class="shrink-0 bg-[#003a8c] text-yellow-400 text-xs font-black px-2 py-0.5 mt-0.5"
+                            style="font-family: 'Oswald', sans-serif;">
+                            {{ r.max_ef }}
+                        </span>
+                        {% endif %}
+                    </div>
                     <p class="text-sm text-slate-600 mt-1">{{ r.event_date }}</p>
-                    <p class="text-xs text-slate-500 mt-1">{{ r.location }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5">{{ r.location }}</p>
+                    <div class="flex items-center gap-3 mt-3 flex-wrap">
+                        {% if r.total_deaths and r.total_deaths > 0 %}
+                        <span class="text-red-600 text-xs font-bold uppercase tracking-wide">{{ r.total_deaths }}
+                            death{{ 's' if r.total_deaths != 1 else '' }}</span>
+                        {% endif %}
+                        {% if r.max_dbz %}
+                        <span class="text-slate-500 text-xs">{{ r.max_dbz }} dBZ</span>
+                        {% endif %}
+                        {% if r.radar_site %}
+                        <span class="text-slate-400 text-xs">{{ r.radar_site }}</span>
+                        {% endif %}
+                    </div>
                 </div>
             </a>
             {% endfor %}
