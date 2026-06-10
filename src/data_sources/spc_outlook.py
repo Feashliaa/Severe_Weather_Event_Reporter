@@ -13,12 +13,15 @@ OUTLOOK_CACHE_DIR = config.CACHE_DIR / "SPC_OUTLOOK"
 _ISSUANCE_TIMES = [100, 1200, 1300, 1630, 2000]
 
 DN_MAP = {
+    # Modern scheme (post Oct 2014)
     2: ('TSTM', 'General Thunderstorms', '#55BB55', '#C1E9C1'),
     3: ('MRGL', 'Marginal Risk', '#005500', '#66A366'),
     4: ('SLGT', 'Slight Risk', '#DDAA00', '#FFE066'),
     5: ('ENH',  'Enhanced Risk', '#FF6600', '#FFA366'),
     6: ('MDT',  'Moderate Risk', '#CC0000', '#E06666'),
     7: ('HIGH', 'High Risk', '#FF00FF', '#FF00FF'),
+    # Legacy scheme (pre Oct 2014)
+    8: ('HIGH', 'High Risk', '#FF00FF', '#FF00FF'),
 }
 
 def _pick_issuance(event_start: datetime) -> str:

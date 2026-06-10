@@ -21,58 +21,71 @@ NCEI_BASE_URL = "https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/"
 NCEI_CACHE_DIR = config.CACHE_DIR / "ncei"
 
 
+_FILENAME_CACHE: dict[int, str] = {}
+
 def _get_csv_filename(year: int) -> str | None:
-    """Find the filename for a given year by scraping the directory listing."""
-    r = httpx.get(NCEI_BASE_URL, timeout=30.0)
-    r.raise_for_status()
-    # Filenames look like: StormEvents_details-ftp_v1.0_d2011_c20230927.csv.gz
-    pattern = rf"StormEvents_details-ftp_v1\.0_d{year}_c\d+\.csv\.gz"
-    match = re.search(pattern, r.text)
-    return match.group(0) if match else None
+    if year in _FILENAME_CACHE:
+        return _FILENAME_CACHE[year]
+    print(f"  NCEI: checking directory for {year} data...")
+    try:
+        r = httpx.get(NCEI_BASE_URL, timeout=httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0))
+        r.raise_for_status()
+        pattern = rf"StormEvents_details-ftp_v1\.0_d{year}_c\d+\.csv\.gz"
+        matches = re.findall(pattern, r.text)
+        if not matches:
+            print(f"  NCEI: no file found for {year}")
+            return None
+        filename = sorted(matches)[-1]
+        _FILENAME_CACHE[year] = filename
+        print(f"  NCEI: found {filename}")
+        return filename
+    except Exception as e:
+        print(f"  NCEI: directory check failed: {e}")
+        return None
 
 
 def _get_cached_path(year: int) -> Path | None:
-    """Return cached path if it exists, checking for updates."""
-    existing = list(NCEI_CACHE_DIR.glob(f"StormEvents_details-ftp_v1.0_d{year}_c*.csv.gz"))
-    if not existing:
-        return None
-    return existing[0]  # return whatever's cached
+    existing = sorted(NCEI_CACHE_DIR.glob(f"StormEvents_details-ftp_v1.0_d{year}_c*.csv.gz"))
+    return existing[-1] if existing else None
 
 
 def _download_year(year: int) -> Path | None:
     NCEI_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # Check if we have a cached version
+
     cached = _get_cached_path(year)
-    
-    # For recent years (current year and last year), always check for updates
+
     current_year = date.today().year
     should_check_update = year >= current_year - 1
-    
+
     if cached and not should_check_update:
-        return cached  # historical years: use cache forever
-    
-    # Check directory for latest filename
+        return cached  # historical years: never check for updates
+
+    # For recent years, check if cached file is recent enough (< 7 days old)
+    if cached:
+        import os
+        age_days = (date.today() - date.fromtimestamp(os.path.getmtime(cached))).days
+        if age_days < 7:
+            return cached  # cached recently enough, skip directory check
+
+    # Need to check for updates
     filename = _get_csv_filename(year)
     if filename is None:
-        return cached  # fall back to cache if directory check fails
-    
+        return cached
+
     latest_path = NCEI_CACHE_DIR / filename
     if latest_path.exists():
-        return latest_path  # already have the latest
-    
-    # New file available — download it
-    print(f"  Downloading updated NCEI Storm Events for {year}...")
+        return latest_path
+
+    print(f"  NCEI: downloading {filename}...")
     url = NCEI_BASE_URL + filename
     r = httpx.get(url, timeout=120.0, follow_redirects=True)
     r.raise_for_status()
     latest_path.write_bytes(r.content)
-    
-    # Delete old cached version if different
+
     if cached and cached != latest_path:
         cached.unlink()
         print(f"    Replaced {cached.name}")
-    
+
     print(f"    Cached to {latest_path.name}")
     return latest_path
 

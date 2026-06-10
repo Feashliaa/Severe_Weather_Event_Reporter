@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from src.data_sources import geocoding
 from src.pipeline import run_pipeline
 from src.report.builder import EventReport, build_html_string
+from src.feature_gates import feature_availability
 
 from src import config
 
@@ -66,9 +67,14 @@ def _run_pipeline_job(
     def progress(msg: str) -> None:
         _jobs[slug]["message"] = msg
         
+    
+    avail = feature_availability(start_utc)
+        
     # Set estimated time as first message before pipeline starts
     _jobs[slug]["message"] = f"Starting pipeline..."
-    _jobs[slug]["estimated_seconds"] = (max_radar_scans * 22) + 60
+    avail = feature_availability(start_utc)
+    render_time_per_8 = 35 if avail.radar_dual_pol else 15
+    _jobs[slug]["estimated_seconds"] = int((max_radar_scans / 8) * render_time_per_8 + 65)
     
     try:
         run_pipeline(
@@ -165,7 +171,7 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
     _jobs[slug] = {
         "status": "processing",
         "message": "Starting pipeline...",
-        "estimated_seconds": (req.max_radar_scans * 22) + 60,
+        "estimated_seconds": int((req.max_radar_scans / 8) * 35 + 65),
         "error": None,
     }
 

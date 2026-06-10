@@ -3,7 +3,7 @@
 Orchestrates data fetching, radar processing, and LLM narrative generation.
 Each step is extracted into a helper function for testability and clarity.
 """
-import json, re, math, time
+import json, re, math, time, os
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
@@ -17,6 +17,7 @@ from src.models import VTECEventRef
 from src.radar import processor as radar_processor
 from src.radar import renderer as radar_renderer
 from src.report.builder import EventReport, generate_narrative, compute_lead_time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 from typing import Callable
@@ -306,32 +307,23 @@ def _process_scan(
     radar_site_lat: float | None,
     radar_site_lon: float | None,
     event_name: str | None,
-    progress: Callable[[str], None] | None = None,
 ) -> tuple[dict, str] | None:
-    """Process a single radar scan. Returns (features_dict, image_path) or None on failure"""
-    
-    def _p(msg: str) -> None:
-        print(msg)
-        if progress: progress(msg)
-    
+    """Process a single radar scan. Runs in a worker process."""
     try:
         features = radar_processor.extract_features(path)
         ts_safe = features.timestamp.replace(":", "-").replace(".", "-")[:19]
         img_path = images_dir / f"{ts_safe}_reflectivity.png"
         radar_renderer.render_radar_panel(
-            path,
-            img_path,
-            center_lat=zoom_lat,
-            center_lon=zoom_lon,
-            zoom_km=zoom_km,
-            radar_site_lat=radar_site_lat,
-            radar_site_lon=radar_site_lon,
-            event_label=event_name
+            path, img_path,
+            center_lat=zoom_lat, center_lon=zoom_lon, zoom_km=zoom_km,
+            radar_site_lat=radar_site_lat, radar_site_lon=radar_site_lon,
+            event_label=event_name,
         )
-        _p(f"    {features.timestamp}: {features.max_reflectivity_dbz} dBZ, top {features.echo_top_18dbz_kft} kft => rendered {img_path.name}")
+        print(f"    {features.timestamp}: {features.max_reflectivity_dbz} dBZ, "
+              f"top {features.echo_top_18dbz_kft} kft => rendered {img_path.name}")
         return features.to_dict(), f"images/{img_path.name}"
     except Exception as e:
-        _p(f"    Failed to process {path.name}: {e}")
+        print(f"    Failed to process {path.name}: {e}")
         return None
 
 
@@ -350,35 +342,47 @@ def _process_radar(
     progress: Callable[[str], None] | None = None,
 ) -> tuple[list, list]:
     """Download and process radar scans. Returns (radar_features, radar_images)."""
-
     def _p(msg: str) -> None:
         print(msg)
         if progress: progress(msg)
 
     all_scans = nexrad.list_scans(radar_site, start, end)
     key_scans = nexrad.pick_key_scans(all_scans, max_scans=max_radar_scans)
-
     t0 = time.time()
-    _p(f"  Downloading {len(all_scans)} scans...")
+    _p(f"  Downloading {len(key_scans)} scans...")
     local_paths = nexrad.download_scans(key_scans)
     print(f"    Download took {time.time() - t0:.1f}s")
 
-    radar_features = []
-    radar_images = []
     t1 = time.time()
+    workers = min(len(local_paths), os.cpu_count() or 4)
+    results: dict[int, tuple[dict, str]] = {}
 
-    for i, path in enumerate(local_paths, 1):
-        result = _process_scan(
-            path, images_dir, zoom_lat, zoom_lon, zoom_km,
-            radar_site_lat, radar_site_lon, event_name, progress,
-        )
-        elapsed = time.time() - t1
-        print(f"    Scan {i}/{len(local_paths)} complete - {elapsed:.1f}s elapsed, {elapsed/i:.1f}s avg")
-        _p(f"  Rendered scan {i} of {len(local_paths)}...")
-        if result is not None:
-            features_dict, img_path = result
-            radar_features.append(features_dict)
-            radar_images.append(img_path)
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        futures = {
+            ex.submit(
+                _process_scan,
+                path, images_dir, zoom_lat, zoom_lon, zoom_km,
+                radar_site_lat, radar_site_lon, event_name,
+            ): i
+            for i, path in enumerate(local_paths)
+        }
+        done = 0
+        for fut in as_completed(futures):
+            i = futures[fut]
+            done += 1
+            try:
+                result = fut.result()
+            except Exception as e:
+                _p(f"    Failed to process {local_paths[i].name}: {e}")
+                result = None
+            elapsed = time.time() - t1
+            _p(f"  Rendered scan {done} of {len(local_paths)} ({elapsed:.1f}s elapsed)")
+            if result is not None:
+                results[i] = result
+
+    # Reassemble in original scan order, not completion order
+    radar_features = [results[i][0] for i in sorted(results)]
+    radar_images = [results[i][1] for i in sorted(results)]
 
     print(f"  Total render time: {time.time() - t1:.1f}s for {len(local_paths)} scans")
     return radar_features, radar_images
@@ -458,6 +462,8 @@ def run_pipeline(
     Returns the path to the event output directory containing
     manifest.json and report_data.json.
     """
+    
+    start_time = time.perf_counter()
     
     def _progress(msg: str) -> None:
         print(msg)
@@ -570,7 +576,11 @@ def run_pipeline(
     dat_tracks = {'polygons':[], 'lines':[]}
     try:
         zoom_bbox = (zoom_lon - 1.5, zoom_lat - 1.5, zoom_lon + 1.5, zoom_lat + 1.5)
-        dat_tracks = dat.fetch_tornado_tracks(zoom_bbox, start)
+        dat_tracks = dat.fetch_tornado_tracks(
+            zoom_bbox, start,
+            center_lat=zoom_lat,
+            center_lon=zoom_lon,
+            )
         total = len(dat_tracks['polygons']) + len(dat_tracks['lines'])
         if total > 0:
             _progress(f"    Dat: {len(dat_tracks['lines'])} track(s), {len(dat_tracks['polygons'])} polygon(s)")
@@ -616,5 +626,11 @@ def run_pipeline(
 
     # Step 4: write outputs
     _write_outputs(event_output_dir, slug, event_name, location, event_date, radar_site, report, local_timezone)
+    
+    end_time = time.perf_counter()
+    
+    elapsed = end_time - start_time
+    
+    print(f"Execution Time: {elapsed:.6f} seconds")
 
     return event_output_dir

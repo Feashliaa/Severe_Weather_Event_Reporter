@@ -9,6 +9,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const datTracks = JSON.parse(container.dataset.datTracks || '{"polygons":[],"lines":[]}');
     const spcOutlook = JSON.parse(container.dataset.spcOutlook || 'null');
 
+    // Override DAT ef_scale with comments if they mention a higher rating
+    function parseEFFromComments(efScale, comments) {
+        if (!comments) return efScale;
+        const matches = [...comments.matchAll(/EF[-\s]?([0-5])/gi)];
+        if (!matches.length) return efScale;
+        const efRank = { 'EF0': 0, 'EF1': 1, 'EF2': 2, 'EF3': 3, 'EF4': 4, 'EF5': 5 };
+        const highest = matches.reduce((best, m) => {
+            const candidate = `EF${m[1]}`;
+            return (efRank[candidate] || 0) > (efRank[best] || 0) ? candidate : best;
+        }, efScale);
+        return highest;
+    }
+
     const map = L.map('event-map', {
         zoomControl: true,
         fullscreenControl: true, // Appends the button to the map
@@ -40,23 +53,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }).bindPopup(`
                 <b>SPC Day 1 Outlook: ${props.LABEL}</b><br>
                 ${props.LABEL2}<br>
-                <small>Issued: ${props.ISSUE} ? props.ISSUE.slice(0, 8) + ' '+ props.ISSUE.slice(8, 12) + 'Z' : '-'}</small>
+                <small>Issued: ${props.ISSUE ? props.ISSUE.slice(0, 8) + ' ' + props.ISSUE.slice(8, 12) + 'Z' : '-'}</small>
                 `).addTo(map);
         })
 
-        // Legend
+        const eventYear = parseInt('{{ report.event_date }}'.slice(-4));
+        const modernScheme = eventYear >= 2014;
+
         const legend = L.control({ position: 'bottomleft' });
         legend.onAdd = () => {
             const div = L.DomUtil.create('div');
             div.style.cssText = 'background:rgba(255,255,255,0.9);padding:8px 10px;font-size:11px;line-height:1.6;border:1px solid #ccc;';
             div.innerHTML = `
-            <div style="font-weight:bold;margin-bottom:4px;font-family:Oswald,sans-serif;font-size:12px;">SPC DAY 1 OUTLOOK</div>
-            <div><span style="display:inline-block;width:12px;height:12px;background:#FF00FF;margin-right:5px;"></span>HIGH</div>
-            <div><span style="display:inline-block;width:12px;height:12px;background:#E06666;margin-right:5px;"></span>MDT</div>
-            <div><span style="display:inline-block;width:12px;height:12px;background:#FFA366;margin-right:5px;"></span>ENH</div>
-            <div><span style="display:inline-block;width:12px;height:12px;background:#FFE066;margin-right:5px;"></span>SLGT</div>
-            <div><span style="display:inline-block;width:12px;height:12px;background:#66A366;margin-right:5px;"></span>MRGL</div>
-        `;
+        <div style="font-weight:bold;margin-bottom:4px;font-family:Oswald,sans-serif;font-size:12px;">SPC DAY 1 OUTLOOK</div>
+        <div><span style="display:inline-block;width:12px;height:12px;background:#FF00FF;margin-right:5px;"></span>HIGH</div>
+        <div><span style="display:inline-block;width:12px;height:12px;background:#E06666;margin-right:5px;"></span>MDT</div>
+        ${modernScheme ? `<div><span style="display:inline-block;width:12px;height:12px;background:#FFA366;margin-right:5px;"></span>ENH</div>` : ''}
+        <div><span style="display:inline-block;width:12px;height:12px;background:#FFE066;margin-right:5px;"></span>SLGT</div>
+        ${modernScheme ? `<div><span style="display:inline-block;width:12px;height:12px;background:#66A366;margin-right:5px;"></span>MRGL</div>` : ''}
+    `;
             return div;
         };
         legend.addTo(map);
@@ -130,31 +145,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasDat = (datTracks.polygons.length + datTracks.lines.length) > 0;
 
     if (hasDat) {
-        // DAT polygons — variable-width damage corridors (Joplin, El Reno etc)
+        // DAT polygons - variable-width damage corridors (Joplin, El Reno etc)
         datTracks.polygons.forEach(t => {
             if (!t.coords || t.coords.length < 3) return;
-            const color = efColors[t.ef_scale] || '#7f1d1d';
+            const efScale = parseEFFromComments(t.ef_scale, t.comments);
+            const color = efColors[efScale] || '#7f1d1d';
             L.polygon(t.coords, {
                 color: color,
                 weight: 1.5,
                 fillColor: color,
                 fillOpacity: 0.35,
             }).bindPopup(`
-                <b>${t.ef_scale || 'Tornado'} — DAT Damage Polygon</b><br>
-                ${t.length_mi && t.length_mi > 0 ? `Path: ${t.length_mi} mi<br>` : ''}
-                ${t.width_yd && t.width_yd > 0 ? `Width: ${t.width_yd} yd<br>` : ''}
-                ${t.fatalities > 0 ? `Fatalities: ${t.fatalities}<br>` : ''}
-                ${t.injuries > 0 ? `Injuries: ${t.injuries}<br>` : ''}
-                ${t.comments ? `<em>${t.comments}</em>` : ''}
-            `).addTo(map);
+        <b>${efScale || 'Tornado'} - DAT Damage Polygon</b><br>
+        ${t.length_mi && t.length_mi > 0 ? `Path: ${t.length_mi} mi<br>` : ''}
+        ${t.width_yd && t.width_yd > 0 ? `Width: ${t.width_yd} yd<br>` : ''}
+        ${t.fatalities > 0 ? `Fatalities: ${t.fatalities}<br>` : ''}
+        ${t.injuries > 0 ? `Injuries: ${t.injuries}<br>` : ''}
+        ${t.comments ? `<em>${t.comments}</em>` : ''}
+    `).addTo(map);
             t.coords.forEach(c => allPoints.push(c));
         });
 
-        // DAT lines — curved multi-point surveyed centerlines
+        // DAT lines - curved multi-point surveyed centerlines
         datTracks.lines.forEach(t => {
             if (!t.coords || t.coords.length < 2) return;
-            const color = efColors[t.ef_scale] || '#7f1d1d';
-            const weight = t.ef_scale === 'EF5' ? 6 : t.ef_scale === 'EF4' ? 5 : 3;
+            const efScale = parseEFFromComments(t.ef_scale, t.comments);
+            const color = efColors[efScale] || '#7f1d1d';
+            const weight = efScale === 'EF5' ? 6 : efScale === 'EF4' ? 5 : 3;
 
             // Width buffer along the surveyed line
             if (t.width_yd && t.width_yd > 0 && t.coords.length >= 2) {
@@ -171,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 weight: weight,
                 opacity: 0.9,
             }).bindPopup(`
-                <b>${t.ef_scale || 'Tornado'} — DAT Surveyed Track</b><br>
+                <b>${t.ef_scale || 'Tornado'} - DAT Surveyed Track</b><br>
                 ${t.event_id ? `Event: ${t.event_id}<br>` : ''}
                 ${t.length_mi && t.length_mi > 0 ? `Path: ${t.length_mi} mi<br>` : ''}
                 ${t.width_yd && t.width_yd > 0 ? `Width: ${t.width_yd} yd<br>` : ''}
@@ -179,14 +196,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${t.fatalities > 0 ? `Fatalities: ${t.fatalities}<br>` : ''}
                 ${t.injuries > 0 ? `Injuries: ${t.injuries}<br>` : ''}
                 ${t.wfo ? `WFO: ${t.wfo}<br>` : ''}
-                ${t.comments ? `<em>${t.comments}</em>` : ''}
             `).addTo(map);
 
             t.coords.forEach(c => allPoints.push(c));
         });
 
     } else {
-        // Fallback — NCEI straight lines
+        // Fallback - NCEI straight lines
         ncei.forEach(e => {
             if (e.event_type !== 'Tornado') return;
             if (!e.begin_lat || !e.begin_lon || !e.end_lat || !e.end_lon) return;

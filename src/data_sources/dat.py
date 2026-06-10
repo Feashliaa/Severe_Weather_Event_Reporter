@@ -67,34 +67,32 @@ def _query_layer(layer: int, bbox: tuple, where: str, cache_key: str) -> list[di
 
 def fetch_tornado_tracks(
     bbox: tuple[float, float, float, float],
-    event_date: datetime
-) -> dict [str, Any]:
-    """
-    Fetch DAT tornado geometry for an event.
-    
-    Return dict with:
-        'polygons': list of polygon track dicts (layer 2) - variable-width damage corridors
-        'lines': list of line track dicts (layer 1) - curved multi-pointed centerlines
-        
-    Both lists may be empty if the DAT has no data for the event.
-    bbox: (min_lon, min_lat, max_lon, max_lat)
-    """
+    event_date: datetime,
+    center_lat: float | None = None,
+    center_lon: float | None = None,
+    max_dist_deg: float = 0.8,
+) -> dict[str, Any]:
     start_ts, end_ts = _timestamp_window(event_date)
     where = f"stormdate >= timestamp '{start_ts}' AND stormdate <= timestamp '{end_ts}'"
-    
-    # Use a cache key based on the bbox and event date to avoid redundant queries
-    # Set precision to 2 decimal places to allow for some spatial tolerance in caching
     cache_key = f"{bbox[0]:.2f}_{bbox[1]:.2f}_{bbox[2]:.2f}_{bbox[3]:.2f}_{event_date.strftime('%Y%m%d')}"
-    
-    # layer 2 - polygons
+
+    def _near_center(coords: list) -> bool:
+        if not center_lat or not center_lon:
+            return True
+        return any(
+            abs(c[0] - center_lat) < max_dist_deg and abs(c[1] - center_lon) < max_dist_deg
+            for c in coords[::5]
+        )
+
     polygons = []
     for feat in _query_layer(2, bbox, where, cache_key):
         attrs = feat.get('attributes', {})
         rings = feat.get('geometry', {}).get('rings', [[]])
         if not rings or not rings[0]:
             continue
-        # convert the [lon, lat] pairs to [lat, lon] for consistency with other data sources
         coords = [[pt[1], pt[0]] for pt in rings[0]]
+        if not _near_center(coords):
+            continue
         polygons.append({
             'ef_scale': _parse_ef(attrs.get('efscale', '')),
             'ef_num': attrs.get('efnum', -1),
@@ -106,16 +104,16 @@ def fetch_tornado_tracks(
             'comments': attrs.get('comments'),
             'coords': coords,
         })
-    
-    # layer 1 - lines
+
     lines = []
     for feat in _query_layer(1, bbox, where, cache_key):
         attrs = feat.get('attributes', {})
         paths = feat.get('geometry', {}).get('paths', [[]])
-        
         if not paths or not paths[0]:
             continue
         coords = [[pt[1], pt[0]] for pt in paths[0]]
+        if not _near_center(coords):
+            continue
         lines.append({
             'ef_scale': _parse_ef(attrs.get('efscale', '')),
             'ef_num': attrs.get('efnum', -1),
@@ -129,9 +127,5 @@ def fetch_tornado_tracks(
             'comments': attrs.get('comments'),
             'coords': coords,
         })
-        
-    return {
-        'polygons': polygons,
-        'lines': lines
-    }
-            
+
+    return {'polygons': polygons, 'lines': lines}

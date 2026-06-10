@@ -442,7 +442,7 @@
                     </svg>
                 </summary>
                 <div class="p-5 md:p-7">
-                    <div id="event-map" style="height: 450px; border: 2px solid #003a8c;"
+                    <div id="event-map" style="height: 450px; border: 2px solid #003a8c; z-index: 1;"
                         data-spc-outlook='{{ report.spc_outlook | tojson }}'
                         data-lat="{{ report.warnings[0].polygon.coordinates[0][0][1] if report.warnings and report.warnings[0].polygon else report.lsrs[0].lat if report.lsrs else 39.0 }}"
                         data-lon="{{ report.warnings[0].polygon.coordinates[0][0][0] if report.warnings and report.warnings[0].polygon else report.lsrs[0].lon if report.lsrs else -98.0 }}"
