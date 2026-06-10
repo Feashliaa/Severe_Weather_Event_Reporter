@@ -455,12 +455,18 @@
                         <span class="inline-block w-3 h-3 rounded-full bg-blue-500 ml-3 mr-1"></span> LSR
                     </p>
                 </div>
+                <div class="px-4 py-2 bg-slate-50 border-t border-[#facc15] text-xs text-slate-500 text-center">
+                    <span class="font-bold text-slate-700">Disclaimer:</span> Tornado tracks are drawn as straight lines
+                    between NCEI-recorded start and end coordinates.<br>
+                    Actual paths may curve. Width corridors are based on maximum reported width and are approximate.
+                </div>
             </details>
+
         </section>
         {% endif %}
 
         {% if report.radar_images %}
-        <section id="radar" class="gov-card mb-4 scroll-mt-20">
+        <section id=" radar" class="gov-card mb-4 scroll-mt-20">
             <details open>
                 <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
                     <span>RADAR LOOP</span>
@@ -480,7 +486,8 @@
                             <span id="loop-frame-label">FRAME 01 OF {{ "%02d" % (report.radar_images | length)
                                 }}</span>
                             <span class="font-mono text-yellow-400" id="loop-timestamp">{{
-                                report.radar_features[0].timestamp[:19] if report.radar_features else "" }}</span>
+                                report.radar_features[0].timestamp[:19] if report.radar_features else ""
+                                }}</span>
                         </div>
                         <button type="button" id="loop-expand"
                             class="block w-full cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-yellow-400"
