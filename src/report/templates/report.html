@@ -443,10 +443,12 @@
                 </summary>
                 <div class="p-5 md:p-7">
                     <div id="event-map" style="height: 450px; border: 2px solid #003a8c;"
+                        data-spc-outlook='{{ report.spc_outlook | tojson }}'
                         data-lat="{{ report.warnings[0].polygon.coordinates[0][0][1] if report.warnings and report.warnings[0].polygon else report.lsrs[0].lat if report.lsrs else 39.0 }}"
                         data-lon="{{ report.warnings[0].polygon.coordinates[0][0][0] if report.warnings and report.warnings[0].polygon else report.lsrs[0].lon if report.lsrs else -98.0 }}"
                         data-warnings='{{ report.warnings | tojson }}' data-lsrs='{{ report.lsrs | tojson }}'
-                        data-ncei='{{ report.ncei_events | tojson }}'>
+                        data-ncei='{{ report.ncei_events | tojson }}'
+                        data-dat-tracks='{{ report.dat_tracks | tojson }}'>
                     </div>
                     <p class="text-xs text-slate-500 mt-2">
                         <span class="inline-block w-3 h-3 bg-red-600 mr-1"></span> Tornado Warning
@@ -456,10 +458,14 @@
                     </p>
                 </div>
                 <div class="px-4 py-2 bg-slate-50 border-t border-[#facc15] text-xs text-slate-500 text-center">
-                    <span class="font-bold text-slate-700">Disclaimer:</span> Tornado tracks are drawn as straight lines
-                    between NCEI-recorded start and end coordinates.<br>
-                    Actual paths may curve. Width corridors are based on maximum reported width and are approximate.
+                    <span class="font-bold text-slate-700">Disclaimer:</span> Tornado tracks use NWS DAT surveyed
+                    geometry
+                    when available, otherwise NCEI start/end coordinates as straight lines. Actual paths may curve.
+                    Width
+                    corridors are based on maximum reported width and are approximate.
                 </div>
+
+
             </details>
 
         </section>

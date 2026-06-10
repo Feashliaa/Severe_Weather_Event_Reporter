@@ -34,6 +34,8 @@ class EventReport:
     narrative: str = ""
     outbreak_context: dict | None = None
     lead_time: dict | None = None
+    dat_tracks: dict = field(default_factory=lambda: {'polygons': [], 'lines': []})
+    spc_outlook: dict | None = None
 
 
 SYSTEM_PROMPT = """You are a meteorologist writing a post-event severe weather report.

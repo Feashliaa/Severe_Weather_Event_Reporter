@@ -11,7 +11,7 @@ from shapely.geometry import Point, shape
 from shapely.ops import unary_union
 
 from src import config
-from src.data_sources import discovery, geocoding, iem, nexrad, radar_locator, ncei, billion_dollar, sounding
+from src.data_sources import discovery, geocoding, iem, nexrad, radar_locator, ncei, billion_dollar, sounding, dat, spc_outlook
 from src.feature_gates import feature_availability, FeatureAvailability
 from src.models import VTECEventRef
 from src.radar import processor as radar_processor
@@ -297,7 +297,6 @@ def _fetch_ncei(
     return all_events
     
     
-
 def _process_scan(
     path: Path,
     images_dir: Path,
@@ -423,6 +422,8 @@ def _write_outputs(
         "radar_images": report.radar_images,
         "feature_notes": report.feature_notes,
         "lead_time": report.lead_time,
+        "dat_tracks": report.dat_tracks,
+        "spc_outlook": report.spc_outlook,
     }
     (event_output_dir / "report_data.json").write_text(
         json.dumps(report_data, indent=2, default=str)
@@ -564,6 +565,33 @@ def run_pipeline(
     else:
         _progress("  Could not compute lead time (missing or insufficient data)")
         
+        
+    # Step 2c: Fet DAT tornado tracks
+    dat_tracks = {'polygons':[], 'lines':[]}
+    try:
+        zoom_bbox = (zoom_lon - 1.5, zoom_lat - 1.5, zoom_lon + 1.5, zoom_lat + 1.5)
+        dat_tracks = dat.fetch_tornado_tracks(zoom_bbox, start)
+        total = len(dat_tracks['polygons']) + len(dat_tracks['lines'])
+        if total > 0:
+            _progress(f"    Dat: {len(dat_tracks['lines'])} track(s), {len(dat_tracks['polygons'])} polygon(s)")
+        else:
+            _progress("     Dat: no survey data available")
+    except Exception as e:
+        _progress(f"    Dat: fetch failed ({e})")
+        
+    # Step 2d: Fetch SPC Outlook overlay
+    outlook = None
+    try:
+        outlook = spc_outlook.fetch_outlook(start)
+        if outlook:
+            features = outlook.get('features', [])
+            labels = [f['properties']['LABEL'] for f in features if f['properties'].get('LABEL') not in ('TSTM',)]
+            _progress(f"  SPC outlook: {', '.join(labels) if labels else 'TSTM only'}")
+        else:
+            _progress("  SPC outlook: no data available")
+    except Exception as e:
+        _progress(f"  SPC outlook: failed ({e})")
+        
     # Step 3: assemble report + generate narrative
     report = EventReport(
         event_name=event_name,
@@ -579,6 +607,8 @@ def run_pipeline(
         feature_notes=avail.notes,
         outbreak_context=outbreak_context,
         lead_time=lead_time,
+        dat_tracks=dat_tracks,
+        spc_outlook=outlook,
     )
 
     _progress("Generating narrative...")

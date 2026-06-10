@@ -254,6 +254,8 @@ async def view_report(slug: str):
         sounding_image=data.get("sounding_image", None),
         outbreak_context=data.get("outbreak_context", None),
         lead_time=data.get("lead_time", None),
+        dat_tracks=data.get("dat_tracks", {'polygons': [], 'lines': []}),
+        spc_outlook=data.get("spc_outlook"),
         radar_features=data.get("radar_features", []),
         radar_images=data.get("radar_images", []),
         feature_notes=data.get("feature_notes", []),
