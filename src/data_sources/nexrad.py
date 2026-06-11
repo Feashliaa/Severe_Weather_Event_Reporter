@@ -15,7 +15,6 @@ import nexradaws
 
 from src import config
 
-
 _conn = nexradaws.NexradAwsInterface()
 
 

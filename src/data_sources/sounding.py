@@ -5,15 +5,13 @@ Fetches pre-event atmospheric profile, and computes severe weather indices.
 With that it renders a Skew-T diagram and a report of the indices.
 
 """
-import math
+import math, httpx, pyart, matplotlib, json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-import httpx
-import numpy as np
-import matplotlib
-import json
 import pandas as pd
+import numpy as np
+import metpy.calc as mpcalc
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -23,9 +21,7 @@ from metpy.calc import (
     cape_cin, parcel_profile,
 )
 from metpy.units import units as munits
-
-from metpy.plots import SkewT
-import numpy as np
+from metpy.plots import SkewT, Hodograph
 from siphon.simplewebservice.wyoming import WyomingUpperAir
 
 RAOB_ENDPOINT = "https://mesonet.agron.iastate.edu/json/raob.py"
@@ -106,6 +102,80 @@ _UA_STATIONS = [
     ("MHX", 34.78, -76.88),  # Newport NC
     ("RAX", 35.66, -78.49),  # Raleigh NC
 ]
+
+def extract_vad(radar_path: Path) -> dict | None:
+    """Extract VAD wind profile from a NEXRAD Level II File."""
+    try:
+        radar = pyart.io.read_nexrad_archive(str(radar_path))
+        if 'velocity' not in radar.fields:
+            return None
+        
+        vad = pyart.retrieve.vad_browning(
+            radar, 'velocity',
+            z_want=np.arange(500, 10000, 500)
+        )
+
+        mask = ~np.ma.getmaskarray(np.ma.array(vad.u_wind))
+        if not mask.any():
+            return None
+        
+        return{
+            'u_wind': [float(x) for x in np.array(vad.u_wind)[mask]],
+            'v_wind': [float(x) for x in np.array(vad.v_wind)[mask]],
+            'height_m': [float(x) for x in np.array(vad.height)[mask]],
+        }
+    except Exception as e:
+        print(f"    Vad extraction failed: {e}")
+        return None
+    
+
+def compute_srh(vad_data: dict) -> dict:
+    """Compute SRH from VAD wind profile"""
+    try:
+        u = np.array(vad_data['u_wind']) * munits('m/s')
+        v = np.array(vad_data['v_wind']) * munits('m/s')
+        h = np.array(vad_data['height_m']) * munits('m')
+
+        srh_01 = mpcalc.storm_relative_helicity(h, u, v, depth=1000 * munits.m)
+        srh_03 = mpcalc.storm_relative_helicity(h, u, v, depth=3000 * munits.m)
+
+        return {
+            'srh_01km': round(float(srh_01[2].magnitude)),
+            'srh_03km': round(float(srh_03[2].magnitude)),
+        }
+    except Exception as e:
+        print(f"    SRH computation failed: {e}")
+        return {}
+
+def render_hodograph(vad_data: dict, output_path: Path) -> Path | None:
+    """Render Hodograph from VAD wind profile."""
+    try:
+        u = np.array(vad_data['u_wind']) * munits('m/s')
+        v = np.array(vad_data['v_wind']) * munits('m/s')
+        h = np.array(vad_data['height_m']) * munits('m')
+
+        fig, ax = plt.subplots(figsize=(5, 5), dpi=90)
+        fig.patch.set_facecolor('#1c2b3a')
+        ax.set_facecolor('#1c2b3a')
+
+        h_obj = Hodograph(ax, component_range=50)
+        h_obj.add_grid(increment=10, color='white', alpha=0.2)
+        h_obj.plot_colormapped(u, v, h, cmap='jet')
+
+        ax.tick_params(colors='white')
+        for spine in ax.spines.values():
+            spine.set_edgecolor('#3a4a5c')
+
+        plt.title('VAD Hodograph', color='white', fontsize=10)
+        plt.tight_layout()
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=90, facecolor='#1c2b3a', bbox_inches='tight')
+        plt.close(fig)
+        return output_path
+    except Exception as e:
+        print(f"    Hodograph render failed: {e}")
+        return None
 
 def _nearest_station(lat: float, lon: float) -> str | None:
     """Find nearest upper air station to given coordinates."""
@@ -305,7 +375,6 @@ def compute_indices(sounding: dict) -> dict:
         print(f"  Sounding indices failed: {e}")
         return {}
 
-
 def render_skewt(sounding: dict, output_path: Path) -> Path | None:
     """Render a Skew-T log-P diagram and save as PNG."""
     try:
@@ -386,7 +455,7 @@ def render_skewt(sounding: dict, output_path: Path) -> Path | None:
                 color='white', length=6, linewidth=0.8
             )
 
-        title = f"Sounding | {sounding['station']} {sounding.get('valid', '')[:10]}"
+        title = f"Sounding | {sounding['station']} {sounding.get('valid', '')[:13].replace('T', ' ')}Z"
         fig.suptitle(title, color='white', fontsize=11, y=0.98)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)

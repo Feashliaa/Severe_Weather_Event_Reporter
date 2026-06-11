@@ -102,13 +102,3 @@ def get_station(icao: str) -> NexradStation | None:
                 commissioned=s.get("commissioned"),
             )
     return None
-
-
-
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 3:
-        print("Usage: python -m src.data_sources.radar_locator <lat> <lon>")
-        sys.exit(1)
-    nearest = find_nearest_radar(float(sys.argv[1]), float(sys.argv[2]))
-    print(nearest)

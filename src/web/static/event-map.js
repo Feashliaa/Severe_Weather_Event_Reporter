@@ -57,7 +57,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 `).addTo(map);
         })
 
-        const eventYear = parseInt('{{ report.event_date }}'.slice(-4));
+        const eventYear = parseInt(container.dataset.eventYear || '2015'); // default to 2015 - Modern scheme
+        try{
+            console.log("Event Year: ", eventYear);
+        }catch{
+            console.log("Failed");
+        }
         const modernScheme = eventYear >= 2014;
 
         const legend = L.control({ position: 'bottomleft' });

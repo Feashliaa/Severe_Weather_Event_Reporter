@@ -93,11 +93,11 @@ def fetch_lsrs_by_bbox(
     """Fetch all LSRs in a bounding box within a time window.
 
     Unlike fetch_lsrs() (which is scoped to a single warning polygon),
-    this returns every LSR in the region — including ones filed after
+    this returns every LSR in the region - including ones filed after
     warnings expired or not associated with any specific VTEC event.
 
     Args:
-        sts: Start time as ISO string (e.g., "2013-05-20T19:00Z")
+        sts: Start time as ISO string (e.g., "2026-05-20T19:00Z")
         ets: End time as ISO string
         west, east, south, north: Bounding box in decimal degrees
     """

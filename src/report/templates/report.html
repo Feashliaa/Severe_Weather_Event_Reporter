@@ -234,12 +234,14 @@
                         </div>
                         {% endif %}
 
-                        {% if s.total_injuries > 0 %}
+                        {% if s.max_path_mi %}
                         <div class="border border-[#facc15] rounded p-3 text-center">
-                            <div class="text-orange-600 text-xs uppercase tracking-wider font-bold mb-1">Injuries</div>
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Path Length</div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ s.total_injuries }}</div>
-                            <div class="text-slate-500 text-xs mt-1">direct injuries</div>
+                                {{ s.max_path_mi }}</div>
+                            <div class="text-slate-500 text-xs mt-1">
+                                mi {% if s.path_source == 'NCEI' %}(longest county segment){% else %}(DAT surveyed){% endif %}
+                            </div>
                         </div>
                         {% endif %}
 
@@ -323,7 +325,7 @@
         <section id="sounding" class="gov-card mb-4 scroll-mt-20">
             <details open>
                 <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
-                    <span>PRE-EVENT SOUNDING</span>
+                    <span>PRE-EVENT SOUNDING & VAD WINDS</span>
                     <span class="flex items-center gap-2">
                         {% if report.sounding_indices %}
                         <span class="gov-header-count">{{ report.sounding_indices.station }} {{
@@ -336,15 +338,34 @@
                     </span>
                 </summary>
                 <div class="p-5 md:p-7">
-                    <img src="{{ report.sounding_image }}" alt="Pre-event sounding"
-                        class="w-full max-w-2xl mx-auto block cursor-zoom-in"
-                        data-lightbox-src="{{ report.sounding_image }}" data-lightbox-caption="Pre-event Sounding - 
-                        {{ report.sounding_indices.station if report.sounding_indices else '' }} 
-                         {{ report.sounding_indices.valid[:10] if report.sounding_indices else '' }}">
-                    {% if report.sounding_indices %}
-                    <div class="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+
+                    <!-- Skew-T and Hodograph side by side -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">Skew-T Log-P</p>
+                            <img src="{{ report.sounding_image }}" alt="Pre-event sounding"
+                                class="w-full block cursor-zoom-in"
+                                style="max-height: 320px;"
+                                data-lightbox-src="{{ report.sounding_image }}"
+                                data-lightbox-caption="Pre-event Sounding - {{ report.sounding_indices.station if report.sounding_indices else '' }} {{ report.sounding_indices.valid[:10] if report.sounding_indices else '' }}">
+                        </div>
+                        {% if report.hodograph_image %}
+                        <div>
+                            <p class="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">VAD Hodograph (Event-Time)</p>
+                            <img src="{{ report.hodograph_image }}" alt="VAD Hodograph"
+                                class="block cursor-zoom-in mx-auto"
+                                style="max-height: 320px; max-width: 320px;"
+                                data-lightbox-src="{{ report.hodograph_image }}"
+                                data-lightbox-caption="VAD Hodograph - derived from radar velocity field">
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Indices cards -->
+                    {% if report.sounding_indices or report.vad_srh %}
+                    <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                         {% set si = report.sounding_indices %}
-                        {% if si.cape_jkg is not none %}
+                        {% if si and si.cape_jkg is not none %}
                         <div class="border border-[#facc15] rounded p-2 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">CAPE</div>
                             <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
@@ -352,7 +373,7 @@
                             <div class="text-slate-500 text-xs">J/kg</div>
                         </div>
                         {% endif %}
-                        {% if si.cin_jkg is not none %}
+                        {% if si and si.cin_jkg is not none %}
                         <div class="border border-[#facc15] rounded p-2 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">CIN</div>
                             <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
@@ -360,7 +381,7 @@
                             <div class="text-slate-500 text-xs">J/kg</div>
                         </div>
                         {% endif %}
-                        {% if si.bulk_shear_06km_kt is not none %}
+                        {% if si and si.bulk_shear_06km_kt is not none %}
                         <div class="border border-[#facc15] rounded p-2 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">0-6km Shear</div>
                             <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
@@ -368,7 +389,7 @@
                             <div class="text-slate-500 text-xs">knots</div>
                         </div>
                         {% endif %}
-                        {% if si.sfc_temp_c is not none %}
+                        {% if si and si.sfc_temp_c is not none %}
                         <div class="border border-[#facc15] rounded p-2 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">Sfc Temp</div>
                             <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
@@ -376,7 +397,7 @@
                             <div class="text-slate-500 text-xs">°C</div>
                         </div>
                         {% endif %}
-                        {% if si.sfc_dewpoint_c is not none %}
+                        {% if si and si.sfc_dewpoint_c is not none %}
                         <div class="border border-[#facc15] rounded p-2 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">Sfc Dewpoint</div>
                             <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
@@ -384,7 +405,7 @@
                             <div class="text-slate-500 text-xs">°C</div>
                         </div>
                         {% endif %}
-                        {% if si.sfc_pressure_hpa is not none %}
+                        {% if si and si.sfc_pressure_hpa is not none %}
                         <div class="border border-[#facc15] rounded p-2 text-center">
                             <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">Sfc Pressure</div>
                             <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
@@ -392,11 +413,35 @@
                             <div class="text-slate-500 text-xs">hPa</div>
                         </div>
                         {% endif %}
+                        {% if report.vad_srh %}
+                        {% set vs = report.vad_srh %}
+                        {% if vs.srh_01km is not none %}
+                        <div class="border border-[#facc15] rounded p-2 text-center">
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">0-1km SRH</div>
+                            <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
+                                vs.srh_01km }}</div>
+                            <div class="text-slate-500 text-xs">m²/s²</div>
+                        </div>
+                        {% endif %}
+                        {% if vs.srh_03km is not none %}
+                        <div class="border border-[#facc15] rounded p-2 text-center">
+                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold">0-3km SRH</div>
+                            <div class="text-slate-900 text-xl font-black" style="font-family: 'Oswald', sans-serif;">{{
+                                vs.srh_03km }}</div>
+                            <div class="text-slate-500 text-xs">m²/s²</div>
+                        </div>
+                        {% endif %}
+                        {% endif %}
                     </div>
                     {% endif %}
-                    <p class="text-xs text-slate-500 mt-3">Upper air sounding from {{ report.sounding_indices.station if
-                        report.sounding_indices else 'nearest station' }} - nearest pre-event balloon launch. Source:
-                        IEM RAOB Archive.</p>
+
+                    <p class="text-xs text-slate-500 mt-3">
+                        Skew-T: nearest pre-event balloon launch from {{ report.sounding_indices.station if
+                        report.sounding_indices else 'nearest station' }} - Source: IEM RAOB Archive / University of
+                        Wyoming.
+                        {% if report.hodograph_image %}Hodograph derived from VAD winds extracted from event-time radar
+                        velocity data.{% endif %}
+                    </p>
                 </div>
             </details>
         </section>
@@ -447,8 +492,9 @@
                         data-lat="{{ report.warnings[0].polygon.coordinates[0][0][1] if report.warnings and report.warnings[0].polygon else report.lsrs[0].lat if report.lsrs else 39.0 }}"
                         data-lon="{{ report.warnings[0].polygon.coordinates[0][0][0] if report.warnings and report.warnings[0].polygon else report.lsrs[0].lon if report.lsrs else -98.0 }}"
                         data-warnings='{{ report.warnings | tojson }}' data-lsrs='{{ report.lsrs | tojson }}'
-                        data-ncei='{{ report.ncei_events | tojson }}'
-                        data-dat-tracks='{{ report.dat_tracks | tojson }}'>
+                        data-ncei='{{ ncei_for_map  | tojson }}'
+                        data-dat-tracks='{{ report.dat_tracks | tojson }}'
+                        data-event-year="{{ report.event_date[-4:] }}">
                     </div>
                     <p class="text-xs text-slate-500 mt-2">
                         <span class="inline-block w-3 h-3 bg-red-600 mr-1"></span> Tornado Warning
@@ -464,8 +510,6 @@
                     Width
                     corridors are based on maximum reported width and are approximate.
                 </div>
-
-
             </details>
 
         </section>

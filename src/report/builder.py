@@ -1,4 +1,5 @@
 """Assembles the final HTML report from structured data + LLM narrative."""
+
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -14,11 +15,13 @@ from jinja2 import Environment, FileSystemLoader
 from src.llm.base import get_client
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-EF_RANK = {'EF0': 0, 'EF1': 1, 'EF2': 2, 'EF3': 3, 'EF4': 4, 'EF5': 5, 'EFU': -1}
+EF_RANK = {"EF0": 0, "EF1": 1, "EF2": 2, "EF3": 3, "EF4": 4, "EF5": 5, "EFU": -1}
+
 
 @dataclass
 class EventReport:
     """Bundled data for a single event - feeds both the LLM and the template."""
+
     event_name: str
     event_date: str
     location: str
@@ -34,8 +37,10 @@ class EventReport:
     narrative: str = ""
     outbreak_context: dict | None = None
     lead_time: dict | None = None
-    dat_tracks: dict = field(default_factory=lambda: {'polygons': [], 'lines': []})
+    dat_tracks: dict = field(default_factory=lambda: {"polygons": [], "lines": []})
     spc_outlook: dict | None = None
+    hodograph_image: str | None = None
+    vad_srh: dict = field(default_factory=dict)
 
 
 SYSTEM_PROMPT = """You are a meteorologist writing a post-event severe weather report.
@@ -44,6 +49,7 @@ CRITICAL RULES:
 1. Only reference values, times, and facts from the structured data provided.
 2. Do not invent radar values, casualty counts, or any quantitative information.
 3. Do not interpret radar imagery - use only the pre-extracted numeric features.
+4. Do not include any statistics, damage estimates, or impact figures that are not explicitly present in the structured data provided.
 4. If data is incomplete or ambiguous, say so explicitly rather than speculating.
 5. Write in clear, professional prose suitable for a public-facing report.
 6. SYNTHESIZE radar data - describe TRENDS (intensification, weakening, core descent)
@@ -63,6 +69,16 @@ CRITICAL RULES:
     severe weather event, explicitly note that surface heating likely increased CAPE
     dramatically by event time, and that the shear values are more representative of
     the storm environment than the instability values.
+13. VAD WINDS: If VAD wind profile data is provided, use it in the environmental context
+    section alongside the sounding. VAD winds represent the actual storm-time kinematic
+    environment and are more current than the balloon sounding. Reference SRH by name
+    and explain its role in mesocyclone development.
+14. DATA HIERARCHY: When multiple sources provide the same metric, use this priority order:
+    - Path length/width: DAT surveyed tracks > NCEI episode total > NCEI single county segment
+    - EF rating: NCEI post-survey > LSR preliminary  
+    - Fatalities/injuries: Use COMPUTED TOTALS, not individual NCEI records
+    - Property damage: Suppress if flagged as incomplete
+    Do not cite a single county's path length as the full track length.
 
 Structure: overview -> environmental context (include sounding analysis here if available)
 -> storm evolution -> warnings issued (include lead time discussion here) -> impacts -> conclusion.
@@ -80,7 +96,7 @@ def generate_narrative(report: EventReport) -> str:
     lead_time = report.lead_time
     lead_time_section = ""
     if lead_time:
-        if lead_time.get('data_quality') == 'uncertain':
+        if lead_time.get("data_quality") == "uncertain":
             lead_time_section = f"""
     WARNING LEAD TIME:
     Lead time calculation produced an implausible result ({abs(lead_time['lead_time_minutes'])} minutes before warning).
@@ -89,7 +105,7 @@ def generate_narrative(report: EventReport) -> str:
     Do not state a definitive lead time. Instead note in the warnings section that the NCEI begin time
     appears inconsistent with the warning issuance time, and that actual lead time is uncertain.
     """
-        elif lead_time['had_warning']:
+        elif lead_time["had_warning"]:
             lead_time_section = f"""
     WARNING LEAD TIME:
     The first tornado warning was issued at {lead_time['first_warning_utc']},
@@ -120,22 +136,25 @@ Note: This is outbreak-level data, not individual tornado damage.
 
         # Compute how many hours before event the sounding is
         sounding_note = ""
-        if s.get('valid'):
+        if s.get("valid"):
             try:
                 from datetime import datetime, timezone
-                sounding_dt = datetime.fromisoformat(s['valid'].replace('Z', '+00:00'))
-                # event_start is available via report context — use first radar scan as proxy
+
+                sounding_dt = datetime.fromisoformat(s["valid"].replace("Z", "+00:00"))
+                # event_start is available via report context - use first radar scan as proxy
                 if report.radar_features:
                     first_scan = datetime.fromisoformat(
-                        report.radar_features[0]['timestamp'].replace('Z', '+00:00')
+                        report.radar_features[0]["timestamp"].replace("Z", "+00:00")
                     )
-                    hours_before = round((first_scan - sounding_dt).total_seconds() / 3600, 1)
+                    hours_before = round(
+                        (first_scan - sounding_dt).total_seconds() / 3600, 1
+                    )
                     if hours_before > 0:
                         sounding_note = (
                             f"This sounding was taken approximately {hours_before} hours before the event. "
                             f"Atmospheric conditions, particularly instability and wind shear, may have changed "
                             f"significantly by event time. For morning soundings with low CAPE, note that surface "
-                            f"heating typically increases CAPE dramatically by afternoon — the morning sounding "
+                            f"heating typically increases CAPE dramatically by afternoon - the morning sounding "
                             f"represents the pre-convective environment, not the storm environment."
                         )
                     else:
@@ -156,26 +175,60 @@ Note: This is outbreak-level data, not individual tornado damage.
     Use these values in the environmental context section to explain the atmospheric setup.
     """
 
-    client = get_client()
+    dat_section = ""
+    if report.dat_tracks:
+        lines = report.dat_tracks.get("lines", [])
+        polygons = report.dat_tracks.get("polygons", [])
+        dat_entries = lines + polygons
+        if dat_entries:
+            dat_section = """
+    DAT SURVEYED TRACKS (NWS post-event damage survey - authoritative geometry):
+    These are official NWS survey results. Prefer these over NCEI for path length and width.
+    """
+            for t in dat_entries:
+                if t.get("ef_num", -1) < 0:
+                    continue
+                if not t.get("length_mi") or float(t.get("length_mi") or 0) <= 0:
+                    continue  # skip non-track entries
+                dat_section += f"""
+    - {t.get('ef_scale')} | Event: {t.get('event_id') or 'unnamed'} | WFO: {t.get('wfo') or '-'}
+    Path: {t.get('length_mi')} mi | Width: {t.get('width_yd')} yd | Max Wind: {t.get('max_wind') or '-'} mph
+    Fatalities: {t.get('fatalities', 0)} | Injuries: {t.get('injuries', 0)}
+    """
 
-    lead_time = report.lead_time
+    vad_section = ""
+    if report.vad_srh:
+        v = report.vad_srh
+        vad_section = f"""
+    VAD WIND PROFILE (extracted from first radar scan - event-time atmospheric profile):
+    0-1km SRH: {v.get('srh_01km')} m²/s²
+    - <150 = weak rotation potential, 150-300 = moderate, 300-500 = significant, >500 = extreme
+    0-3km SRH: {v.get('srh_03km')} m²/s²
+    - >150 = supercell favorable, >300 = significant tornado potential
+    Note: VAD winds are derived from the radar velocity field at event time - more representative
+    of the actual storm environment than the pre-event balloon sounding.
+    Use these values alongside the sounding to describe the kinematic environment.
+    If SRH values are high, discuss their role in supporting mesocyclone development and tornado potential.
+    """
 
     # Compute totals so LLM doesn't have to sum across county records
-    total_deaths = sum(e.get('deaths_direct', 0) or 0 for e in report.ncei_events)
-    total_injuries = sum(e.get('injuries_direct', 0) or 0 for e in report.ncei_events)
-    tornado_count = sum(1 for e in report.ncei_events if e.get('event_type') == 'Tornado')
+    total_deaths = sum(e.get("deaths_direct", 0) or 0 for e in report.ncei_events)
+    total_injuries = sum(e.get("injuries_direct", 0) or 0 for e in report.ncei_events)
+    tornado_count = sum(
+        1 for e in report.ncei_events if e.get("event_type") == "Tornado"
+    )
 
     # Find dominant episode
-    tornado_events = [e for e in report.ncei_events if e.get('event_type') == 'Tornado']
-    episodes = [e.get('episode_id') for e in tornado_events if e.get('episode_id')]
+    tornado_events = [e for e in report.ncei_events if e.get("event_type") == "Tornado"]
+    episodes = [e.get("episode_id") for e in tornado_events if e.get("episode_id")]
     dominant_episode = Counter(episodes).most_common(1)[0][0] if episodes else None
 
     # Sum path lengths within dominant episode
     episode_path_total = 0.0
     for e in report.ncei_events:
-        if e.get('event_type') == 'Tornado' and e.get('episode_id') == dominant_episode:
+        if e.get("event_type") == "Tornado" and e.get("episode_id") == dominant_episode:
             try:
-                episode_path_total += float(e.get('tor_length_mi') or 0)
+                episode_path_total += float(e.get("tor_length_mi") or 0)
             except (ValueError, TypeError):
                 pass
 
@@ -188,6 +241,7 @@ Note: This is outbreak-level data, not individual tornado damage.
     Total path length across all county segments of dominant episode: {round(episode_path_total, 1)} miles
     Note: NCEI records are split by county. Do not report a single county's path length as the total.
     Path lengths summed above represent all county segments of the same tornado system.
+    Note: Do not reference episode IDs, event IDs, or other internal database identifiers in the narrative.
     """
 
     user_prompt = f"""Generate a post-event report narrative for the following event.
@@ -196,36 +250,51 @@ EVENT: {report.event_name}
 DATE: {report.event_date}
 LOCATION: {report.location}
 
+--- AUTHORITATIVE SURVEY DATA ---
+
+{dat_section}
+
+{computed_totals}
+
+NCEI STORM EVENTS ({len(report.ncei_events)} records - post-survey verified):
+Prefer these over LSRs for EF ratings, path dimensions, casualties, and damage estimates.
+NCEI records are split by county - use COMPUTED TOTALS and DAT for aggregate figures.
+{json.dumps(report.ncei_events, indent=2, default=str)}
+
+--- OBSERVATIONAL DATA ---
+
 WARNINGS ISSUED ({len(report.warnings)} total):
 {json.dumps(report.warnings, indent=2, default=str)}
 
 LOCAL STORM REPORTS ({len(report.lsrs)} total):
 {json.dumps(report.lsrs, indent=2, default=str)}
 
-NCEI STORM EVENTS ({len(report.ncei_events)} records - post-survey verified):
-Prefer these over LSRs for EF ratings, path dimensions, casualties, and damage estimates.
-{json.dumps(report.ncei_events, indent=2, default=str)}
-
 RADAR FEATURES (extracted from Level II volume scans):
-Fields: timestamp, max reflectivity (dBZ), height of max reflectivity (kft AGL), 
+Fields: timestamp, max reflectivity (dBZ), height of max reflectivity (kft AGL),
 echo tops at 18/50 dBZ (kft), max inbound/outbound velocities (knots).
-
 Interpret trends:
 - Rising echo tops = updraft strengthening / overshooting tops.
 - High-reflectivity core descent (Max dBZ spikes while height of max reflectivity drops) = significant hail core descent or low-level debris ball signature during maximum tornadic intensity.
-- Strong velocity couplet = mesocyclone rotation. 
-
+- Strong velocity couplet = mesocyclone rotation.
 CRITICAL RADAR CONSTRAINT:
-If max inbound and outbound velocities show identical, repeating values across multiple timestamps (e.g., exactly 65.1 knots), 
-do NOT describe the rotation as "static" or "stable." Interpret this as the mesocyclone completely saturating or 
-exceeding the radar's maximum unambiguous velocity threshold (the Nyquist limit), 
+If max inbound and outbound velocities show identical, repeating values across multiple timestamps (e.g., exactly 65.1 knots),
+do NOT describe the rotation as "static" or "stable." Interpret this as the mesocyclone completely saturating or
+exceeding the radar's maximum unambiguous velocity threshold (the Nyquist limit),
 proving the actual rotational winds were higher than the instrument could natively measure.
-
 {json.dumps(report.radar_features, indent=2, default=str)}
-{computed_totals}
+
+--- ATMOSPHERIC CONTEXT ---
+
 {sounding_section}
-{lead_time_section}
+
+{vad_section}
+
 {outbreak_section}
+
+--- TIMING & WARNINGS ---
+
+{lead_time_section}
+
 Write the narrative HTML now. Cite specific timestamps and values. Only use data above."""
 
     raw = client.generate(SYSTEM_PROMPT, user_prompt, max_tokens=8192)
@@ -247,19 +316,50 @@ def _format_time_with_local_tz(iso_str: str, local_tz: str) -> str:
         return f"{utc_part} ({local_part})"
     except (ValueError, TypeError):
         return iso_str  # Return raw string if parsing fails
-        
+
+
+def _ncei_for_map(ncei_events: list) -> list:
+    """Strip heavy fields not needed for map rendering."""
+    return [
+        {
+            "event_type": e.get("event_type"),
+            "begin_lat": e.get("begin_lat"),
+            "begin_lon": e.get("begin_lon"),
+            "end_lat": e.get("end_lat"),
+            "end_lon": e.get("end_lon"),
+            "tor_f_scale": e.get("tor_f_scale"),
+            "tor_length_mi": e.get("tor_length_mi"),
+            "tor_width_yd": e.get("tor_width_yd"),
+            "county": e.get("county"),
+            "begin_time": e.get("begin_time"),
+            "deaths_direct": e.get("deaths_direct", 0),
+            "deaths_indirect": e.get("deaths_indirect", 0),
+            "injuries_direct": e.get("injuries_direct", 0),
+            "injuries_indirect": e.get("injuries_indirect", 0),
+            "damage_property": e.get("damage_property"),
+        }
+        for e in ncei_events
+    ]
+
 
 def build_html_string(report: EventReport, local_timezone: str = "UTC") -> str:
-    """Render the report to an HTML string without writing to disk."""
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), autoescape=True)
     env.filters["fmt_time"] = lambda s: _format_time_with_local_tz(s, local_timezone)
     template = env.get_template("report.html")
-    return template.render(report=report, summary=compute_summary(report))
+    return template.render(
+        report=report,
+        summary=compute_summary(report),
+        ncei_for_map=_ncei_for_map(report.ncei_events),
+    )
 
-def compute_lead_time(warnings: list, ncei_events: list, lsrs: list, local_timezone: str = "UTC") -> dict | None:
+
+def compute_lead_time(
+    warnings: list, ncei_events: list, lsrs: list, local_timezone: str = "UTC"
+) -> dict | None:
 
     tornado_warnings = [
-        w for w in warnings
+        w
+        for w in warnings
         if w.get("phenomena") == "TO" and w.get("significance") == "W"
     ]
     if not tornado_warnings:
@@ -274,29 +374,30 @@ def compute_lead_time(warnings: list, ncei_events: list, lsrs: list, local_timez
         return None
 
     local_tz = ZoneInfo(local_timezone)
-    ef_rank = {'EF0': 0, 'EF1': 1, 'EF2': 2, 'EF3': 3, 'EF4': 4, 'EF5': 5, 'EFU': -1}
+    ef_rank = {"EF0": 0, "EF1": 1, "EF2": 2, "EF3": 3, "EF4": 4, "EF5": 5, "EFU": -1}
 
-    # Find dominant episode — most tornado records share this episode ID
-    tornado_events = [e for e in ncei_events if e.get('event_type') == 'Tornado']
-    episodes = [e.get('episode_id') for e in tornado_events if e.get('episode_id')]
+    # Find dominant episode - most tornado records share this episode ID
+    tornado_events = [e for e in ncei_events if e.get("event_type") == "Tornado"]
+    episodes = [e.get("episode_id") for e in tornado_events if e.get("episode_id")]
     dominant_episode = Counter(episodes).most_common(1)[0][0] if episodes else None
 
     # Restrict to dominant episode if available
     candidates = (
-        [e for e in tornado_events if e.get('episode_id') == dominant_episode]
-        if dominant_episode else tornado_events
+        [e for e in tornado_events if e.get("episode_id") == dominant_episode]
+        if dominant_episode
+        else tornado_events
     )
 
     best_tornado = max(
         candidates,
-        key=lambda e: ef_rank.get(e.get('tor_f_scale', ''), -1),
-        default=None
+        key=lambda e: ef_rank.get(e.get("tor_f_scale", ""), -1),
+        default=None,
     )
 
-    if best_tornado and best_tornado.get('begin_time'):
-        dt = _parse_ncei_dt(best_tornado['begin_time'])
+    if best_tornado and best_tornado.get("begin_time"):
+        dt = _parse_ncei_dt(best_tornado["begin_time"])
         if dt:
-            dt_utc = dt.replace(tzinfo=local_tz).astimezone(ZoneInfo('UTC'))
+            dt_utc = dt.replace(tzinfo=local_tz).astimezone(ZoneInfo("UTC"))
             lead_minutes = (dt_utc - first_warning).total_seconds() / 60
 
             if lead_minutes < -30:
@@ -320,7 +421,11 @@ def compute_lead_time(warnings: list, ncei_events: list, lsrs: list, local_timez
         if l.get("event") == "TORNADO" and l.get("time"):
             try:
                 dt = datetime.fromisoformat(l["time"].replace("Z", "+00:00"))
-                dt_utc = dt.astimezone(ZoneInfo("UTC")) if dt.tzinfo else dt.replace(tzinfo=ZoneInfo("UTC"))
+                dt_utc = (
+                    dt.astimezone(ZoneInfo("UTC"))
+                    if dt.tzinfo
+                    else dt.replace(tzinfo=ZoneInfo("UTC"))
+                )
                 lead_minutes = (dt_utc - first_warning).total_seconds() / 60
                 if lead_minutes < -30:
                     return {
@@ -340,7 +445,8 @@ def compute_lead_time(warnings: list, ncei_events: list, lsrs: list, local_timez
                 pass
 
     return None
-    
+
+
 def _parse_ncei_dt(value: str) -> datetime | None:
     """Parse NCEI datetime strings."""
     if not value:
@@ -356,7 +462,8 @@ def _parse_ncei_dt(value: str) -> datetime | None:
         except ValueError:
             continue
     return None
-                    
+
+
 def compute_summary(report: EventReport) -> dict:
     """Compute impact summary stats for the report template."""
     max_ef = None
@@ -366,64 +473,87 @@ def compute_summary(report: EventReport) -> dict:
     total_damage = 0.0
     max_path = 0.0
     total_path = 0.0  # Added to track overall episode footprint
-    
+
     # Combined into a single loop over events for efficiency
     for e in report.ncei_events:
-        total_deaths += e.get('deaths_direct', 0) or 0
-        total_injuries += e.get('injuries_direct', 0) or 0
+        total_deaths += e.get("deaths_direct", 0) or 0
+        total_injuries += e.get("injuries_direct", 0) or 0
 
-        if e.get('damage_property'):
-            total_damage += e['damage_property']
-            
-        if e.get('tor_length_mi'):
+        if e.get("damage_property"):
+            total_damage += e["damage_property"]
+
+        if e.get("tor_length_mi"):
             try:
-                length = float(e['tor_length_mi'])
+                length = float(e["tor_length_mi"])
                 total_path += length  # Sum everything in the county episode
                 if length > max_path:
                     max_path = length
             except (ValueError, TypeError):
                 pass
-                
+
         # Handle normalization for legacy 'F' scales and modern 'EF' scales
-        raw_scale = e.get('tor_f_scale')
+        raw_scale = e.get("tor_f_scale")
         if raw_scale:
             # Clean string (e.g., "F5 " or "EF5" -> "5")
-            clean_rating = str(raw_scale).strip().replace('EF', '').replace('F', '')
+            clean_rating = str(raw_scale).strip().replace("EF", "").replace("F", "")
             try:
                 # Use the raw integer digit (0-5) as the rank baseline
                 rank = int(clean_rating)
                 if rank > max_ef_rank:
                     max_ef_rank = rank
-                    max_ef = str(raw_scale).strip()  # Preserves "F5" or "EF5" for the UI
+                    max_ef = str(
+                        raw_scale
+                    ).strip()  # Preserves "F5" or "EF5" for the UI
             except (ValueError, TypeError):
                 pass
 
     radar_dbz = [
-        f['max_reflectivity_dbz'] for f in report.radar_features
-        if f.get('max_reflectivity_dbz') is not None
+        f["max_reflectivity_dbz"]
+        for f in report.radar_features
+        if f.get("max_reflectivity_dbz") is not None
     ]
     radar_tops = [
-        f['echo_top_18dbz_kft'] for f in report.radar_features
-        if f.get('echo_top_18dbz_kft') is not None
+        f["echo_top_18dbz_kft"]
+        for f in report.radar_features
+        if f.get("echo_top_18dbz_kft") is not None
     ]
-    
+
     # Suppress damage if clearly incomplete relative to event severity
     if max_ef_rank >= 3 and total_damage < 100_000:
         total_damage = None
     elif total_damage < 10_000:
         total_damage = None
 
+    # DAT path length takes priority over NCEI
+    dat_path_mi = None
+    path_source = "NCEI"
+
+    if report.dat_tracks:
+        all_tracks = report.dat_tracks.get("lines", []) + report.dat_tracks.get(
+            "polygons", []
+        )
+        dat_lengths = [
+            float(t["length_mi"])
+            for t in all_tracks
+            if t.get("length_mi")
+            and float(t.get("length_mi") or 0) > 0
+            and t.get("ef_num", -1) >= 0
+        ]
+        if dat_lengths:
+            dat_path_mi = round(max(dat_lengths), 1)
+            path_source = "DAT"
+
     return {
-        'max_ef': max_ef,  # Will now safely pass "F5" to your UI component!
-        'total_deaths': total_deaths,
-        'total_injuries': total_injuries,
-        'total_damage': total_damage,
-        'max_path_mi': round(max_path, 1) if max_path > 0 else None,
-        'total_path_mi': round(total_path, 1) if total_path > 0 else None, # New payload key
-        'max_dbz': round(max(radar_dbz), 1) if radar_dbz else None,
-        'max_tops': round(max(radar_tops), 1) if radar_tops else None,
-        'warning_count': len(report.warnings),
-        'lsr_count': len(report.lsrs),
-        'outbreak_context': report.outbreak_context,
-        'lead_time': report.lead_time,
+        "max_ef": max_ef,  # Will now safely pass "F5" to your UI component!
+        "total_deaths": total_deaths,
+        "total_injuries": total_injuries,
+        "total_damage": total_damage,
+        "max_path_mi": dat_path_mi or round(max_path, 1) if max_path > 0 else None,
+        "total_path_mi": (round(total_path, 1) if total_path > 0 else None),
+        "max_dbz": round(max(radar_dbz), 1) if radar_dbz else None,
+        "max_tops": round(max(radar_tops), 1) if radar_tops else None,
+        "warning_count": len(report.warnings),
+        "lsr_count": len(report.lsrs),
+        "outbreak_context": report.outbreak_context,
+        "lead_time": report.lead_time,
     }

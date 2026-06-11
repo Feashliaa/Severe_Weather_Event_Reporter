@@ -1,4 +1,5 @@
 """FastAPI app for the Severe Weather Event Reporter."""
+
 from datetime import datetime, timedelta, date as date_type
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -16,7 +17,7 @@ from src.feature_gates import feature_availability
 
 from src import config
 
-#from weasyprint import HTML as WeasyHTML
+# from weasyprint import HTML as WeasyHTML
 
 import json
 import math
@@ -33,17 +34,19 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(WEB_STATIC_DIR)), name="static")
 
+
 class ReportRequest(BaseModel):
     """Minimum input required to generate a report via the API."""
+
     event_name: str
     location: str
-    lat: float | None = None     # if provided, skip backend geocoding
+    lat: float | None = None  # if provided, skip backend geocoding
     lon: float | None = None
     date: str
     start_time: str | None = None
     end_time: str | None = None
     tz_mode: str = "local"
-    zoom_km: float = 50.0 # standard
+    zoom_km: float = 50.0  # standard
     max_radar_scans: int = 8
     lsr_search_km: float = 75.0
 
@@ -61,21 +64,22 @@ def _run_pipeline_job(
     zoom_km: float = 50.0,
     max_radar_scans: int = 8,
     lsr_search_km: float = 75.0,
-)-> None:
+) -> None:
     """Wrapper that runs the pipeline and updates job state"""
-    
+
     def progress(msg: str) -> None:
         _jobs[slug]["message"] = msg
-        
-    
+
     avail = feature_availability(start_utc)
-        
+
     # Set estimated time as first message before pipeline starts
     _jobs[slug]["message"] = f"Starting pipeline..."
     avail = feature_availability(start_utc)
     render_time_per_8 = 35 if avail.radar_dual_pol else 15
-    _jobs[slug]["estimated_seconds"] = int((max_radar_scans / 8) * render_time_per_8 + 65)
-    
+    _jobs[slug]["estimated_seconds"] = int(
+        (max_radar_scans / 8) * render_time_per_8 + 65
+    )
+
     try:
         run_pipeline(
             event_name=event_name,
@@ -92,12 +96,12 @@ def _run_pipeline_job(
             zoom_km=zoom_km,
             max_radar_scans=max_radar_scans,
             lsr_search_km=lsr_search_km,
-            progress=progress
+            progress=progress,
         )
-        _jobs[slug] = {"status": "done", "message" : "Complete", "error": None}
+        _jobs[slug] = {"status": "done", "message": "Complete", "error": None}
     except Exception as e:
-        _jobs[slug] = {"status": "failed", "message" : "Failed", "error": str(e)}
-        
+        _jobs[slug] = {"status": "failed", "message": "Failed", "error": str(e)}
+
 
 @app.get("/")
 async def index(request: Request):
@@ -115,9 +119,14 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
     try:
         event_date = datetime.strptime(req.date, "%Y-%m-%d").date()
     except ValueError:
-        raise HTTPException(400, f"Invalid date format: {req.date} (expected YYYY-MM-DD)")
+        raise HTTPException(
+            400, f"Invalid date format: {req.date} (expected YYYY-MM-DD)"
+        )
     if event_date < NEXRAD_START:
-        raise HTTPException(400, f"Events before {NEXRAD_START} are not supported. NEXRAD archive begins June 1991.")
+        raise HTTPException(
+            400,
+            f"Events before {NEXRAD_START} are not supported. NEXRAD archive begins June 1991.",
+        )
 
     start_str = req.start_time or "18:00"
     end_str = req.end_time or "06:00"
@@ -125,7 +134,9 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
         start_time = datetime.strptime(start_str, "%H:%M").time()
         end_time = datetime.strptime(end_str, "%H:%M").time()
     except ValueError:
-        raise HTTPException(400, f"Invalid time format (expected HH:MM, got {start_str}/{end_str})")
+        raise HTTPException(
+            400, f"Invalid time format (expected HH:MM, got {start_str}/{end_str})"
+        )
 
     # Geocode (needed for coords + radar lookup either way)
     # Use provided coords if available; otherwise geocode the location string
@@ -155,18 +166,21 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
         end_utc += timedelta(days=1)
 
     slug = req.event_name.lower().replace(" ", "_")
-    
+
     # If already done, just redirect
     if (config.OUTPUT_DIR / slug / "report_data.json").exists():
         return RedirectResponse(url=f"/reports/{slug}/", status_code=303)
-    
+
         # If already running, redirect to status page
     if _jobs.get(slug, {}).get("status") == "processing":
         return RedirectResponse(url=f"/reports/{slug}/status", status_code=303)
 
     # Only one pipeline at a time
     if any(j.get("status") == "processing" for j in _jobs.values()):
-        raise HTTPException(429, "Another report is currently generating. Please wait a few minutes and try again.")
+        raise HTTPException(
+            429,
+            "Another report is currently generating. Please wait a few minutes and try again.",
+        )
 
     _jobs[slug] = {
         "status": "processing",
@@ -188,7 +202,7 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
         tz_name=tz_name,
         zoom_km=req.zoom_km,
         max_radar_scans=req.max_radar_scans,
-        lsr_search_km=req.lsr_search_km
+        lsr_search_km=req.lsr_search_km,
     )
 
     return RedirectResponse(url=f"/reports/{slug}/status", status_code=303)
@@ -215,28 +229,43 @@ async def gallery(request: Request):
 
                     # Max EF rating
                     ef_rank = {
-                    'EF0':0,'EF1':1,'EF2':2,'EF3':3,'EF4':4,'EF5':5,
-                    'F0':0,'F1':1,'F2':2,'F3':3,'F4':4,'F5':5, 'FU':-1,
-                    'EFU':-1
+                        "EF0": 0,
+                        "EF1": 1,
+                        "EF2": 2,
+                        "EF3": 3,
+                        "EF4": 4,
+                        "EF5": 5,
+                        "F0": 0,
+                        "F1": 1,
+                        "F2": 2,
+                        "F3": 3,
+                        "F4": 4,
+                        "F5": 5,
+                        "FU": -1,
+                        "EFU": -1,
                     }
                     max_ef = None
                     max_rank = -1
                     for e in ncei:
-                        r = ef_rank.get(e.get('tor_f_scale',''), -1)
+                        r = ef_rank.get(e.get("tor_f_scale", ""), -1)
                         if r > max_rank:
                             max_rank = r
-                            max_ef = e.get('tor_f_scale')
+                            max_ef = e.get("tor_f_scale")
 
                     # Total deaths
-                    total_deaths = sum(e.get('deaths_direct', 0) or 0 for e in ncei)
+                    total_deaths = sum(e.get("deaths_direct", 0) or 0 for e in ncei)
 
                     # Max dBZ
-                    dbz_vals = [f['max_reflectivity_dbz'] for f in radar if f.get('max_reflectivity_dbz')]
+                    dbz_vals = [
+                        f["max_reflectivity_dbz"]
+                        for f in radar
+                        if f.get("max_reflectivity_dbz")
+                    ]
                     max_dbz = round(max(dbz_vals), 1) if dbz_vals else None
 
-                    data['max_ef'] = max_ef
-                    data['total_deaths'] = total_deaths
-                    data['max_dbz'] = max_dbz
+                    data["max_ef"] = max_ef
+                    data["total_deaths"] = total_deaths
+                    data["max_dbz"] = max_dbz
 
                 reports.append(data)
             except (json.JSONDecodeError, OSError):
@@ -249,34 +278,38 @@ async def view_report(slug: str):
     data_path = config.OUTPUT_DIR / slug / "report_data.json"
     if not data_path.exists():
         raise HTTPException(404, f"Report not found: {slug}")
-    
+
     try:
         data = json.loads(data_path.read_text())
         report = EventReport(
-        event_name=data["event_name"],
-        event_date=data["event_date"],
-        location=data["location"],
-        narrative=data.get("narrative", ""),
-        warnings=data.get("warnings", []),
-        lsrs=data.get("lsrs", []),
-        ncei_events=data.get("ncei_events", []),
-        sounding_indices=data.get("sounding_indices", {}),
-        sounding_image=data.get("sounding_image", None),
-        outbreak_context=data.get("outbreak_context", None),
-        lead_time=data.get("lead_time", None),
-        dat_tracks=data.get("dat_tracks", {'polygons': [], 'lines': []}),
-        spc_outlook=data.get("spc_outlook"),
-        radar_features=data.get("radar_features", []),
-        radar_images=data.get("radar_images", []),
-        feature_notes=data.get("feature_notes", []),
-    )
+            event_name=data["event_name"],
+            event_date=data["event_date"],
+            location=data["location"],
+            narrative=data.get("narrative", ""),
+            warnings=data.get("warnings", []),
+            lsrs=data.get("lsrs", []),
+            ncei_events=data.get("ncei_events", []),
+            sounding_indices=data.get("sounding_indices", {}),
+            sounding_image=data.get("sounding_image", None),
+            hodograph_image=data.get("hodograph_image", None),
+            vad_srh=data.get("vad_srh", {}),
+            outbreak_context=data.get("outbreak_context", None),
+            lead_time=data.get("lead_time", None),
+            dat_tracks=data.get("dat_tracks", {"polygons": [], "lines": []}),
+            spc_outlook=data.get("spc_outlook"),
+            radar_features=data.get("radar_features", []),
+            radar_images=data.get("radar_images", []),
+            feature_notes=data.get("feature_notes", []),
+        )
 
-        html = build_html_string(report, local_timezone=data.get("local_timezone", "UTC"))
+        html = build_html_string(
+            report, local_timezone=data.get("local_timezone", "UTC")
+        )
         return HTMLResponse(html)
     except (json.JSONDecodeError, KeyError) as e:
         raise HTTPException(500, f"Error loading report data: {e}")
-    
-    
+
+
 @app.get("/reports/{slug}/images/{filename}")
 async def report_image(slug: str, filename: str):
     img_path = config.OUTPUT_DIR / slug / "images" / filename

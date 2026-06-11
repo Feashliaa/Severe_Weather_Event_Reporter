@@ -112,10 +112,10 @@ def _parse_ncei_datetime(value: str) -> datetime | None:
     if not value:
         return None
     for fmt in (
-        "%d-%b-%y %H:%M:%S",    # 21-MAY-24 20:45:00
-        "%d-%b-%Y %H:%M:%S",   # 21-MAY-2024 20:45:00
-        "%m/%d/%Y %H:%M",      # 6/20/2025 22:04
-        "%m/%d/%Y %H:%M:%S",   # 6/20/2025 22:04:00
+        "%d-%b-%y %H:%M:%S",    
+        "%d-%b-%Y %H:%M:%S",   
+        "%m/%d/%Y %H:%M",      
+        "%m/%d/%Y %H:%M:%S",   
     ):
         try:
             return datetime.strptime(value.strip(), fmt)

@@ -3,6 +3,7 @@
 Orchestrates data fetching, radar processing, and LLM narrative generation.
 Each step is extracted into a helper function for testability and clarity.
 """
+
 import json, re, math, time, os
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
@@ -11,7 +12,18 @@ from shapely.geometry import Point, shape
 from shapely.ops import unary_union
 
 from src import config
-from src.data_sources import discovery, geocoding, iem, nexrad, radar_locator, ncei, billion_dollar, sounding, dat, spc_outlook
+from src.data_sources import (
+    discovery,
+    geocoding,
+    iem,
+    nexrad,
+    radar_locator,
+    ncei,
+    billion_dollar,
+    sounding,
+    dat,
+    spc_outlook,
+)
 from src.feature_gates import feature_availability, FeatureAvailability
 from src.models import VTECEventRef
 from src.radar import processor as radar_processor
@@ -22,26 +34,63 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from typing import Callable
 
-
 # ---------------------------------------------------------------------------
 # Step helpers
 # ---------------------------------------------------------------------------
 
 STATE_ABBR = {
-    'AL': 'ALABAMA', 'AK': 'ALASKA', 'AZ': 'ARIZONA', 'AR': 'ARKANSAS',
-    'CA': 'CALIFORNIA', 'CO': 'COLORADO', 'CT': 'CONNECTICUT', 'DE': 'DELAWARE',
-    'FL': 'FLORIDA', 'GA': 'GEORGIA', 'HI': 'HAWAII', 'ID': 'IDAHO',
-    'IL': 'ILLINOIS', 'IN': 'INDIANA', 'IA': 'IOWA', 'KS': 'KANSAS',
-    'KY': 'KENTUCKY', 'LA': 'LOUISIANA', 'ME': 'MAINE', 'MD': 'MARYLAND',
-    'MA': 'MASSACHUSETTS', 'MI': 'MICHIGAN', 'MN': 'MINNESOTA', 'MS': 'MISSISSIPPI',
-    'MO': 'MISSOURI', 'MT': 'MONTANA', 'NE': 'NEBRASKA', 'NV': 'NEVADA',
-    'NH': 'NEW HAMPSHIRE', 'NJ': 'NEW JERSEY', 'NM': 'NEW MEXICO', 'NY': 'NEW YORK',
-    'NC': 'NORTH CAROLINA', 'ND': 'NORTH DAKOTA', 'OH': 'OHIO', 'OK': 'OKLAHOMA',
-    'OR': 'OREGON', 'PA': 'PENNSYLVANIA', 'RI': 'RHODE ISLAND', 'SC': 'SOUTH CAROLINA',
-    'SD': 'SOUTH DAKOTA', 'TN': 'TENNESSEE', 'TX': 'TEXAS', 'UT': 'UTAH',
-    'VT': 'VERMONT', 'VA': 'VIRGINIA', 'WA': 'WASHINGTON', 'WV': 'WEST VIRGINIA',
-    'WI': 'WISCONSIN', 'WY': 'WYOMING',
+    "AL": "ALABAMA",
+    "AK": "ALASKA",
+    "AZ": "ARIZONA",
+    "AR": "ARKANSAS",
+    "CA": "CALIFORNIA",
+    "CO": "COLORADO",
+    "CT": "CONNECTICUT",
+    "DE": "DELAWARE",
+    "FL": "FLORIDA",
+    "GA": "GEORGIA",
+    "HI": "HAWAII",
+    "ID": "IDAHO",
+    "IL": "ILLINOIS",
+    "IN": "INDIANA",
+    "IA": "IOWA",
+    "KS": "KANSAS",
+    "KY": "KENTUCKY",
+    "LA": "LOUISIANA",
+    "ME": "MAINE",
+    "MD": "MARYLAND",
+    "MA": "MASSACHUSETTS",
+    "MI": "MICHIGAN",
+    "MN": "MINNESOTA",
+    "MS": "MISSISSIPPI",
+    "MO": "MISSOURI",
+    "MT": "MONTANA",
+    "NE": "NEBRASKA",
+    "NV": "NEVADA",
+    "NH": "NEW HAMPSHIRE",
+    "NJ": "NEW JERSEY",
+    "NM": "NEW MEXICO",
+    "NY": "NEW YORK",
+    "NC": "NORTH CAROLINA",
+    "ND": "NORTH DAKOTA",
+    "OH": "OHIO",
+    "OK": "OKLAHOMA",
+    "OR": "OREGON",
+    "PA": "PENNSYLVANIA",
+    "RI": "RHODE ISLAND",
+    "SC": "SOUTH CAROLINA",
+    "SD": "SOUTH DAKOTA",
+    "TN": "TENNESSEE",
+    "TX": "TEXAS",
+    "UT": "UTAH",
+    "VT": "VERMONT",
+    "VA": "VIRGINIA",
+    "WA": "WASHINGTON",
+    "WV": "WEST VIRGINIA",
+    "WI": "WISCONSIN",
+    "WY": "WYOMING",
 }
+
 
 def _geocode_location(
     location: str,
@@ -73,19 +122,24 @@ def _select_radar(
     given time window. Falls back to progressively farther sites if the
     nearest has no archive data.
     """
-    
+
     def _p(msg: str) -> None:
         print(msg)
-        if progress: progress(msg)
-    
+        if progress:
+            progress(msg)
+
     if radar_site is None:
         print(f"  Finding nearest NEXRAD to ({zoom_lat:.3f}, {zoom_lon:.3f})...")
-        candidates = radar_locator.find_radars_within(zoom_lat, zoom_lon, radius_km=230.0)
+        candidates = radar_locator.find_radars_within(
+            zoom_lat, zoom_lon, radius_km=230.0
+        )
 
         for candidate in candidates:
             test_scans = nexrad.list_scans(candidate.icao, start, end)
             if test_scans:
-                _p(f"    => {candidate.icao}: {candidate.name} ({candidate.distance_km}km) - {len(test_scans)} scans found")
+                _p(
+                    f"    => {candidate.icao}: {candidate.name} ({candidate.distance_km}km) - {len(test_scans)} scans found"
+                )
                 station = radar_locator.get_station(candidate.icao)
                 return (
                     candidate.icao,
@@ -94,7 +148,9 @@ def _select_radar(
                     station.lon if station else None,
                 )
             else:
-                _p(f"    Skipping {candidate.icao} ({candidate.name}, {candidate.distance_km}km) - no scans on S3")
+                _p(
+                    f"    Skipping {candidate.icao} ({candidate.name}, {candidate.distance_km}km) - no scans on S3"
+                )
 
         raise ValueError(
             f"No NEXRAD data found within 230km of ({zoom_lat:.3f}, {zoom_lon:.3f}) for {start.date()}"
@@ -127,11 +183,12 @@ def _fetch_warnings(
     progress: Callable[[str], None] | None = None,
 ) -> tuple[list, list[VTECEventRef]]:
     """Fetch warning metadata. Returns (warnings, vtec_events_used)."""
-    
+
     def _p(msg: str) -> None:
         print(msg)
-        if progress: progress(msg)
-    
+        if progress:
+            progress(msg)
+
     if auto_discover and not vtec_events:
         if avail.vtec_warnings:
             _p(f"  Discovering warnings at ({zoom_lat:.3f}, {zoom_lon:.3f})...")
@@ -143,14 +200,16 @@ def _fetch_warnings(
                 phenomena=phenomena,
             )
             if not avail.sbw_polygons:
-                _p("  Note: pre-2007 warnings lack polygon geometry; LSR polygon filtering skipped")
+                _p(
+                    "  Note: pre-2007 warnings lack polygon geometry; LSR polygon filtering skipped"
+                )
             _p(f"    => Found {len(vtec_events)} matching events")
         else:
             _p("  Skipping warning auto-discovery (predates VTEC archive)")
             vtec_events = []
 
     warnings = []
-    for ref in (vtec_events or []):
+    for ref in vtec_events or []:
         _p(f"  Fetching {ref.wfo}.{ref.phenomena}.{ref.significance}.{ref.etn}...")
         warning = iem.fetch_event_bundle(
             ref.wfo, ref.year, ref.phenomena, ref.significance, ref.etn
@@ -172,11 +231,12 @@ def _fetch_lsrs(
     progress: Callable[[str], None] | None = None,
 ) -> list:
     """Fetch LSRs by bounding box, deduplicate, and filter to warning polygons."""
-    
+
     def _p(msg: str) -> None:
         print(msg)
-        if progress: progress(msg)
-    
+        if progress:
+            progress(msg)
+
     if not avail.iem_lsr:
         _p("  Skipping LSR fetch (data not reliably archived for this era)")
         return []
@@ -189,7 +249,9 @@ def _fetch_lsrs(
     lsr_start = start - timedelta(hours=1)
     lsr_end = end + timedelta(days=3)
 
-    _p(f"  Fetching LSRs within {lsr_search_km:.0f}km of {zoom_lat:.3f}, {zoom_lon:.3f}...")
+    _p(
+        f"  Fetching LSRs within {lsr_search_km:.0f}km of {zoom_lat:.3f}, {zoom_lon:.3f}..."
+    )
     bbox_lsrs = iem.fetch_lsrs_by_bbox(
         sts=lsr_start.strftime("%Y-%m-%dT%H:%MZ"),
         ets=lsr_end.strftime("%Y-%m-%dT%H:%MZ"),
@@ -222,8 +284,10 @@ def _fetch_lsrs(
             coverage = unary_union(polys)
             before = len(lsrs)
             lsrs = [
-                lsr for lsr in lsrs
-                if lsr.get("lat") and lsr.get("lon")
+                lsr
+                for lsr in lsrs
+                if lsr.get("lat")
+                and lsr.get("lon")
                 and coverage.contains(Point(lsr["lon"], lsr["lat"]))
             ]
             _p(f"    Polygon filter: {before} => {len(lsrs)} LSRs")
@@ -237,7 +301,7 @@ def _extract_warning_counties(warnings: list) -> list[tuple[str, str]]:
     seen = set()
     for w in warnings:
         locations = w.get("locations", "")
-        for match in re.finditer(r'([\w][\w\s]+?)\s*\[([A-Z]{2})\]', locations):
+        for match in re.finditer(r"([\w][\w\s]+?)\s*\[([A-Z]{2})\]", locations):
             county = match.group(1).strip().upper()
             abbr = match.group(2)
             state = STATE_ABBR.get(abbr)
@@ -254,9 +318,11 @@ def _fetch_ncei(
     progress: Callable[[str], None] | None = None,
 ) -> list[dict]:
     """Fetch NCEI Storm Events for the event date and location."""
+
     def _p(msg: str) -> None:
         print(msg)
-        if progress: progress(msg)
+        if progress:
+            progress(msg)
 
     # Build list of (state, county) pairs to query
     query_pairs: list[tuple[str, str]] = []
@@ -272,9 +338,11 @@ def _fetch_ncei(
         if not state:
             _p("  Skipping NCEI lookup (could not determine state from location)")
             return []
-        query_pairs.append((state, county)) # type: ignore
+        query_pairs.append((state, county))  # type: ignore
 
-    _p(f"  Fetching NCEI storm events for {len(query_pairs)} counties on {event_date}...")
+    _p(
+        f"  Fetching NCEI storm events for {len(query_pairs)} counties on {event_date}..."
+    )
 
     all_events = []
     seen_keys: set[tuple] = set()
@@ -287,7 +355,12 @@ def _fetch_ncei(
                 county=county,
             )
             for e in events:
-                key = (e.get("begin_time"), e.get("state"), e.get("county"), e.get("event_type"))
+                key = (
+                    e.get("begin_time"),
+                    e.get("state"),
+                    e.get("county"),
+                    e.get("event_type"),
+                )
                 if key not in seen_keys:
                     seen_keys.add(key)
                     all_events.append(e)
@@ -296,8 +369,55 @@ def _fetch_ncei(
 
     _p(f"    Found {len(all_events)} NCEI storm events total")
     return all_events
+
+
+def _filter_ncei_by_warnings(ncei_events: list, warnings: list) -> list:
+    """Filter NCEI events to those who's coordinates actually fall within the warning polygons
+        Has fallbacks if warnings were too late.
+    """
+    if not warnings:
+        return ncei_events # let the llm figure it out the best it can
     
+    polygons = []
+    for w in warnings:
+        if w.get('polygon'):
+            try:
+                polygons.append(shape(w['polygon']))
+            except Exception:
+                pass
     
+    if not polygons:
+        return ncei_events # warnings exist but no polygons
+    
+    filtered = []
+    unmatched = []
+
+    for e in ncei_events:
+        blat = e.get('begin_lat')
+        blon = e.get('begin_lon')
+        if not blat or not blon:
+            filtered.append(e)
+            continue
+        try:
+            pt = Point(float(blon), float(blat))
+            if any(poly.contains(pt) for poly in polygons):
+                filtered.append(e)
+            else:
+                unmatched.append(e)
+        except (ValueError, TypeError):
+            filtered.append(e)
+
+    if not filtered:
+        return ncei_events # filter removed everything, return original
+    
+    for e in unmatched:
+        scale = e.get('tor_f_scale', '')
+        ef_rank = {'EF3':3, 'EF4':4, 'EF5':5, 'F3':3, 'F4':4, 'F5':5}
+        if ef_rank.get(scale, 0) >= 3:
+            filtered.append(e)
+
+    return filtered
+
 def _process_scan(
     path: Path,
     images_dir: Path,
@@ -314,13 +434,19 @@ def _process_scan(
         ts_safe = features.timestamp.replace(":", "-").replace(".", "-")[:19]
         img_path = images_dir / f"{ts_safe}_reflectivity.png"
         radar_renderer.render_radar_panel(
-            path, img_path,
-            center_lat=zoom_lat, center_lon=zoom_lon, zoom_km=zoom_km,
-            radar_site_lat=radar_site_lat, radar_site_lon=radar_site_lon,
+            path,
+            img_path,
+            center_lat=zoom_lat,
+            center_lon=zoom_lon,
+            zoom_km=zoom_km,
+            radar_site_lat=radar_site_lat,
+            radar_site_lon=radar_site_lon,
             event_label=event_name,
         )
-        print(f"    {features.timestamp}: {features.max_reflectivity_dbz} dBZ, "
-              f"top {features.echo_top_18dbz_kft} kft => rendered {img_path.name}")
+        print(
+            f"    {features.timestamp}: {features.max_reflectivity_dbz} dBZ, "
+            f"top {features.echo_top_18dbz_kft} kft => rendered {img_path.name}"
+        )
         return features.to_dict(), f"images/{img_path.name}"
     except Exception as e:
         print(f"    Failed to process {path.name}: {e}")
@@ -340,29 +466,44 @@ def _process_radar(
     radar_site_lon: float | None,
     event_name: str,
     progress: Callable[[str], None] | None = None,
-) -> tuple[list, list]:
+) -> tuple[list, list, list, dict]:
     """Download and process radar scans. Returns (radar_features, radar_images)."""
+
     def _p(msg: str) -> None:
         print(msg)
-        if progress: progress(msg)
+        if progress:
+            progress(msg)
 
     all_scans = nexrad.list_scans(radar_site, start, end)
     key_scans = nexrad.pick_key_scans(all_scans, max_scans=max_radar_scans)
     t0 = time.time()
     _p(f"  Downloading {len(key_scans)} scans...")
-    local_paths = nexrad.download_scans(key_scans)
+    local_paths = nexrad.download_scans(key_scans)  # local paths
     print(f"    Download took {time.time() - t0:.1f}s")
 
     t1 = time.time()
     workers = min(len(local_paths), os.cpu_count() or 4)
     results: dict[int, tuple[dict, str]] = {}
 
+    vad_data = None
+    if local_paths:
+        try:
+            vad_data = sounding.extract_vad(local_paths[0])
+        except Exception as e:
+            print(f"    VAD extraction failed: {e}")
+
     with ProcessPoolExecutor(max_workers=workers) as ex:
         futures = {
             ex.submit(
                 _process_scan,
-                path, images_dir, zoom_lat, zoom_lon, zoom_km,
-                radar_site_lat, radar_site_lon, event_name,
+                path,
+                images_dir,
+                zoom_lat,
+                zoom_lon,
+                zoom_km,
+                radar_site_lat,
+                radar_site_lon,
+                event_name,
             ): i
             for i, path in enumerate(local_paths)
         }
@@ -385,7 +526,17 @@ def _process_radar(
     radar_images = [results[i][1] for i in sorted(results)]
 
     print(f"  Total render time: {time.time() - t1:.1f}s for {len(local_paths)} scans")
-    return radar_features, radar_images
+
+    _p("Cleaning up scan files...")
+
+    # Clean up raw scan files
+    for path in local_paths:
+        try:
+            path.unlink()
+        except Exception:
+            pass
+
+    return radar_features, radar_images, local_paths, vad_data or {}
 
 
 def _write_outputs(
@@ -421,6 +572,8 @@ def _write_outputs(
         "ncei_events": report.ncei_events,
         "sounding_indices": report.sounding_indices,
         "sounding_image": report.sounding_image,
+        "hodograph_image": report.hodograph_image,
+        "vad_srh": report.vad_srh,
         "outbreak_context": report.outbreak_context,
         "radar_features": report.radar_features,
         "radar_images": report.radar_images,
@@ -438,6 +591,7 @@ def _write_outputs(
 # Main orchestrator
 # ---------------------------------------------------------------------------
 
+
 def run_pipeline(
     event_name: str,
     event_date: str,
@@ -449,7 +603,7 @@ def run_pipeline(
     max_radar_scans: int = 8,
     zoom_lat: float | None = None,
     zoom_lon: float | None = None,
-    zoom_km: float = 50.0, # hard to gauge whats best, somewhere between 35km - 75km
+    zoom_km: float = 50.0,  # hard to gauge whats best, somewhere between 35km - 75km
     lsr_search_km: float = 75.0,
     local_timezone: str = "UTC",
     auto_discover: bool = False,
@@ -462,14 +616,14 @@ def run_pipeline(
     Returns the path to the event output directory containing
     manifest.json and report_data.json.
     """
-    
+
     start_time = time.perf_counter()
-    
+
     def _progress(msg: str) -> None:
         print(msg)
         if progress:
             progress(msg)
-    
+
     slug = event_name.lower().replace(" ", "_")
     event_output_dir = config.OUTPUT_DIR / slug
 
@@ -489,7 +643,9 @@ def run_pipeline(
         window_hours = (end - start).total_seconds() / 3600
         max_radar_scans = max(8, min(16, int(window_hours * 5)))
         if max_radar_scans > 8:
-            print(f"  Auto-scaled to {max_radar_scans} scans for {window_hours:.1f}h window")
+            print(
+                f"  Auto-scaled to {max_radar_scans} scans for {window_hours:.1f}h window"
+            )
 
     # Step 0a: select radar site
     _progress(f"Finding nearest NEXRAD to ({zoom_lat:.3f}, {zoom_lon:.3f})...")
@@ -506,28 +662,67 @@ def run_pipeline(
 
     # Step 0c: fetch warnings
     warnings, vtec_events = _fetch_warnings(
-        vtec_events, auto_discover, avail,
-        zoom_lat, zoom_lon, start, end, discover_phenomena,
+        vtec_events,
+        auto_discover,
+        avail,
+        zoom_lat,
+        zoom_lon,
+        start,
+        end,
+        discover_phenomena,
         progress=progress,
     )
 
     # Step 1: fetch LSRs
     lsrs = _fetch_lsrs(avail, zoom_lat, zoom_lon, lsr_search_km, start, end, warnings)
-    
+
     # Step 1b: fetch NCEI storm events
-    
+
     ncei_events = _fetch_ncei(
         event_date=start.date(),
         location_display_name=location,
         warnings=warnings,
         progress=progress,
     )
-    
-    # Step 1c: fetch pre-event sounding data
-    sounding_data = None
+
+    ncei_events = _filter_ncei_by_warnings(ncei_events, warnings)
+
+    _progress(f"    NCEI: {len(ncei_events)} events after polygon filter")
+
+    # Step 1d: billion-dollar disaster context
+    event_date_obj = datetime.strptime(event_date, "%B %d, %Y").date()
+    outbreak_context = billion_dollar.lookup(event_date_obj)
+    if outbreak_context:
+        _progress(f"  Matched outbreak: {outbreak_context['name']}")
+
+    event_label = geocoding._get_event_city(location)
+
+    # Step 2: process radar
+    if avail.radar:
+        radar_features, radar_images, local_paths, vad_data = _process_radar(
+            radar_site,
+            start,
+            end,
+            max_radar_scans,
+            images_dir,
+            zoom_lat,
+            zoom_lon,
+            zoom_km,
+            radar_site_lat,
+            radar_site_lon,
+            event_name=str(event_label),
+            progress=progress,
+        )
+    else:
+        print("  Skipping radar (no coverage for this event)")
+        radar_features, radar_images, local_paths = [], [], []
+
+    # Step 2a: fetch pre-event sounding data - hodograph
     sounding_indices = {}
     sounding_image = None
-    
+    hodograph_image = None
+    vad_srh = {}
+
     if avail.radar:
         raw_sounding = sounding.fetch_sounding(zoom_lat, zoom_lon, start)
         if raw_sounding:
@@ -537,71 +732,77 @@ def run_pipeline(
             if result:
                 sounding_image = "images/sounding_skewt.png"
             if sounding_indices:
-                _progress(f"  Sounding: CAPE={sounding_indices.get('cape_jkg')} J/kg, "
-                     f"Shear={sounding_indices.get('bulk_shear_06km_kt')} kt")
-    
-    # Step 1d: billion-dollar disaster context
-    event_date_obj = datetime.strptime(event_date, "%B %d, %Y").date()
-    outbreak_context = billion_dollar.lookup(event_date_obj)
-    if outbreak_context:
-        _progress(f"  Matched outbreak: {outbreak_context['name']}")
-    
-    event_label = geocoding._get_event_city(location)
-    
+                _progress(
+                    f"  Sounding: CAPE={sounding_indices.get('cape_jkg')} J/kg, "
+                    f"Shear={sounding_indices.get('bulk_shear_06km_kt')} kt"
+                )
 
-    # Step 2: process radar
-    if avail.radar:
-        radar_features, radar_images = _process_radar(
-            radar_site, start, end, max_radar_scans,
-            images_dir, zoom_lat, zoom_lon, zoom_km,
-            radar_site_lat, radar_site_lon,
-            event_name=str(event_label),
-            progress=progress,
+    # VAD hodograph from first radar scan
+    if local_paths:
+        _progress("  Extracting VAD winds from radar...")
+        if vad_data:
+            vad_srh = sounding.compute_srh(vad_data)
+            hodo_path = images_dir / "hodograph.png"
+            result = sounding.render_hodograph(vad_data, hodo_path)
+            if result:
+                hodograph_image = "images/hodograph.png"
+            if vad_srh:
+                _progress(
+                    f"  VAD: 0-1km SRH={vad_srh.get('srh_01km')} m^2/s^2, "
+                    f"0-3km SRH={vad_srh.get('srh_03km')} m^2/s^2"
+                )
+        else:
+            _progress("  VAD: no wind data available")
+
+    # Step 2b: compute lead time if possible
+    lead_time = compute_lead_time(
+        warnings, ncei_events, lsrs, local_timezone=local_timezone
+    )
+
+    if lead_time:
+        _progress(
+            f"  Computed lead time: {lead_time['lead_time_minutes']} minutes before event start"
         )
     else:
-        print("  Skipping radar (no coverage for this event)")
-        radar_features, radar_images = [], []
-        
-    
-    # Step 2b: compute lead time if possible
-    lead_time = compute_lead_time(warnings, ncei_events, lsrs, local_timezone=local_timezone)
-    
-    if lead_time:
-        _progress(f"  Computed lead time: {lead_time['lead_time_minutes']} minutes before event start")
-    else:
         _progress("  Could not compute lead time (missing or insufficient data)")
-        
-        
+
     # Step 2c: Fet DAT tornado tracks
-    dat_tracks = {'polygons':[], 'lines':[]}
+    dat_tracks = {"polygons": [], "lines": []}
     try:
         zoom_bbox = (zoom_lon - 1.5, zoom_lat - 1.5, zoom_lon + 1.5, zoom_lat + 1.5)
         dat_tracks = dat.fetch_tornado_tracks(
-            zoom_bbox, start,
+            zoom_bbox,
+            start,
             center_lat=zoom_lat,
             center_lon=zoom_lon,
-            )
-        total = len(dat_tracks['polygons']) + len(dat_tracks['lines'])
+        )
+        total = len(dat_tracks["polygons"]) + len(dat_tracks["lines"])
         if total > 0:
-            _progress(f"    Dat: {len(dat_tracks['lines'])} track(s), {len(dat_tracks['polygons'])} polygon(s)")
+            _progress(
+                f"    Dat: {len(dat_tracks['lines'])} track(s), {len(dat_tracks['polygons'])} polygon(s)"
+            )
         else:
             _progress("     Dat: no survey data available")
     except Exception as e:
         _progress(f"    Dat: fetch failed ({e})")
-        
+
     # Step 2d: Fetch SPC Outlook overlay
     outlook = None
     try:
         outlook = spc_outlook.fetch_outlook(start)
         if outlook:
-            features = outlook.get('features', [])
-            labels = [f['properties']['LABEL'] for f in features if f['properties'].get('LABEL') not in ('TSTM',)]
+            features = outlook.get("features", [])
+            labels = [
+                f["properties"]["LABEL"]
+                for f in features
+                if f["properties"].get("LABEL") not in ("TSTM",)
+            ]
             _progress(f"  SPC outlook: {', '.join(labels) if labels else 'TSTM only'}")
         else:
             _progress("  SPC outlook: no data available")
     except Exception as e:
         _progress(f"  SPC outlook: failed ({e})")
-        
+
     # Step 3: assemble report + generate narrative
     report = EventReport(
         event_name=event_name,
@@ -619,18 +820,29 @@ def run_pipeline(
         lead_time=lead_time,
         dat_tracks=dat_tracks,
         spc_outlook=outlook,
+        hodograph_image=hodograph_image,
+        vad_srh=vad_srh,
     )
 
     _progress("Generating narrative...")
     report.narrative = generate_narrative(report)
 
     # Step 4: write outputs
-    _write_outputs(event_output_dir, slug, event_name, location, event_date, radar_site, report, local_timezone)
-    
+    _write_outputs(
+        event_output_dir,
+        slug,
+        event_name,
+        location,
+        event_date,
+        radar_site,
+        report,
+        local_timezone,
+    )
+
     end_time = time.perf_counter()
-    
+
     elapsed = end_time - start_time
-    
+
     print(f"Execution Time: {elapsed:.6f} seconds")
 
     return event_output_dir
