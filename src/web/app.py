@@ -214,7 +214,11 @@ async def gallery(request: Request):
                     radar = rdata.get("radar_features", [])
 
                     # Max EF rating
-                    ef_rank = {'EF0':0,'EF1':1,'EF2':2,'EF3':3,'EF4':4,'EF5':5,'EFU':-1}
+                    ef_rank = {
+                    'EF0':0,'EF1':1,'EF2':2,'EF3':3,'EF4':4,'EF5':5,
+                    'F0':0,'F1':1,'F2':2,'F3':3,'F4':4,'F5':5, 'FU':-1,
+                    'EFU':-1
+                    }
                     max_ef = None
                     max_rank = -1
                     for e in ncei:
