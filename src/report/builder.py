@@ -71,8 +71,8 @@ CRITICAL RULES:
     shear-driven with modest CAPE). Do NOT invent warming or destabilization mechanisms.
     Never attribute instability growth to daytime surface heating for an event occurring
     at night or in the cold season.
-13. VAD WINDS: If VAD wind profile data is provided, use it in the environmental context
-    section alongside the sounding. VAD winds represent the actual storm-time kinematic
+13. Sounding WINDS: If Sounding wind profile data is provided, use it in the environmental context
+    section alongside the sounding. Sounding winds represent the actual storm-time kinematic
     environment and are more current than the balloon sounding. Reference SRH by name
     and explain its role in mesocyclone development.
 14. DATA HIERARCHY: When multiple sources provide the same metric, use this priority order:
@@ -438,6 +438,12 @@ def compute_lead_time(
         ),
     )
 
+    for i, cand in enumerate(ranked):
+        print(
+            f"  >>> candidate {i}: EF={cand.get('tor_f_scale')} begin={cand.get('begin_time')} "
+            f"{cand.get('county')},{cand.get('state')}"
+        )
+
     selected = None
     method = "window_min"
     touchdown_utc = None
@@ -640,30 +646,38 @@ def compute_summary(report: EventReport) -> dict:
     # DAT path length takes priority over NCEI
     dat_path_mi = None
     path_source = "NCEI"
-
     if report.dat_tracks:
-        all_tracks = report.dat_tracks.get("lines", []) + report.dat_tracks.get(
-            "polygons", []
-        )
-        dat_lengths = [
+        # Path length must come from centerline features only; damage-polygon
+        # length_mi describes a swath segment, not the track.
+        line_lengths = [
             float(t["length_mi"])
-            for t in all_tracks
-            if t.get("length_mi")
-            and float(t.get("length_mi") or 0) > 0
-            and t.get("ef_num", -1) >= 0
+            for t in report.dat_tracks.get("lines", [])
+            if t.get("length_mi") and float(t.get("length_mi") or 0) > 0
         ]
-        if dat_lengths:
-            dat_path_mi = round(max(dat_lengths), 1)
+        if line_lengths:
+            dat_path_mi = round(max(line_lengths), 1)
             path_source = "DAT"
 
+    print(
+        f"  >>> DAT lines: {[(t.get('length_mi'), t.get('ef_num')) for t in report.dat_tracks.get('lines', [])]}"
+    )
+
+    if dat_path_mi is not None:
+        max_path_mi = dat_path_mi
+    elif max_path > 0:
+        max_path_mi = round(max_path, 1)
+    else:
+        max_path_mi = None
+
     return {
-        "max_ef": max_ef,  # Will now safely pass "F5" to your UI component!
+        "max_ef": max_ef,
         "total_deaths": total_deaths,
         "impact_label": impact_label,
         "total_injuries": total_injuries,
         "total_damage": total_damage,
-        "max_path_mi": dat_path_mi or round(max_path, 1) if max_path > 0 else None,
-        "total_path_mi": (round(total_path, 1) if total_path > 0 else None),
+        "max_path_mi": max_path_mi,
+        "path_source": path_source,
+        "total_path_mi": round(total_path, 1) if total_path > 0 else None,
         "max_dbz": round(max(radar_dbz), 1) if radar_dbz else None,
         "max_tops": round(max(radar_tops), 1) if radar_tops else None,
         "warning_count": len(report.warnings),

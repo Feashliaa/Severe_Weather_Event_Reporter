@@ -122,6 +122,7 @@ def compute_kinematics_from_sounding(sounding_data: dict) -> dict:
         if not valid_levels:
             print("    [ERROR] Sounding kinematic engine found 0 valid height records.")
             return {}
+        valid_levels.sort(key=lambda l: l["hght"])
 
         # 1. Parse arrays and append strict units
         heights = np.array([l["hght"] for l in valid_levels]) * munits.m
@@ -187,6 +188,7 @@ def render_hodograph_from_sounding(
         ]
         if not valid_levels:
             return None
+        valid_levels.sort(key=lambda l: l["hght"])
 
         heights = np.array([l["hght"] for l in valid_levels]) * munits.m
         directions = np.array([l["drct"] for l in valid_levels]) * munits.deg
@@ -194,13 +196,28 @@ def render_hodograph_from_sounding(
 
         u, v = mpcalc.wind_components(speeds, directions)
 
+        # Hodographs show the convective layer only; upper-level winds
+        # scribble over the meaningful low-level structure.
+        sfc = heights[0]
+        depth_mask = (heights - sfc) <= 9000 * munits.m
+        heights = heights[depth_mask]
+        u = u[depth_mask]
+        v = v[depth_mask]
+
+        print(f"  >>> hodo levels plotted: {len(u)}")
+        print(f"  >>> hodo bottom: h={heights[0]:.0f}, u={u[0]:.1f}, v={v[0]:.1f}")
+        print(f"  >>> hodo top:    h={heights[-1]:.0f}, u={u[-1]:.1f}, v={v[-1]:.1f}")
+
         fig, ax = plt.subplots(figsize=(5, 5), dpi=90)
         fig.patch.set_facecolor("#1c2b3a")
         ax.set_facecolor("#1c2b3a")
 
         h_obj = Hodograph(ax, component_range=60)
         h_obj.add_grid(increment=10, color="white", alpha=0.2)
-        h_obj.plot_colormapped(u, v, heights, cmap="jet")
+        l = h_obj.plot_colormapped(u, v, heights, cmap="viridis")
+        cbar = fig.colorbar(l, ax=ax, shrink=0.8)
+        cbar.set_label("Height (m)", color="white", fontsize=8)
+        cbar.ax.tick_params(colors="white")
 
         ax.tick_params(colors="white")
         for spine in ax.spines.values():
@@ -215,81 +232,6 @@ def render_hodograph_from_sounding(
         return output_path
     except Exception as e:
         print(f"    Sounding Hodograph render failed: {e}")
-        return None
-
-
-def extract_vad(radar_path: Path) -> dict | None:
-    """Extract VAD wind profile from a NEXRAD Level II File."""
-    try:
-        radar = pyart.io.read_nexrad_archive(str(radar_path))
-        if "velocity" not in radar.fields:
-            return None
-
-        vad = pyart.retrieve.vad_browning(
-            radar, "velocity", z_want=np.arange(500, 10000, 500)
-        )
-
-        mask = ~np.ma.getmaskarray(np.ma.array(vad.u_wind))
-        if not mask.any():
-            return None
-
-        return {
-            "u_wind": [float(x) for x in np.array(vad.u_wind)[mask]],
-            "v_wind": [float(x) for x in np.array(vad.v_wind)[mask]],
-            "height_m": [float(x) for x in np.array(vad.height)[mask]],
-        }
-    except Exception as e:
-        print(f"    Vad extraction failed: {e}")
-        return None
-
-
-def compute_srh(vad_data: dict) -> dict:
-    """Compute SRH from VAD wind profile"""
-    try:
-        u = np.array(vad_data["u_wind"]) * munits("m/s")
-        v = np.array(vad_data["v_wind"]) * munits("m/s")
-        h = np.array(vad_data["height_m"]) * munits("m")
-
-        srh_01 = mpcalc.storm_relative_helicity(h, u, v, depth=1000 * munits.m)
-        srh_03 = mpcalc.storm_relative_helicity(h, u, v, depth=3000 * munits.m)
-
-        return {
-            "srh_01km": round(float(srh_01[2].magnitude)),
-            "srh_03km": round(float(srh_03[2].magnitude)),
-        }
-    except Exception as e:
-        print(f"    SRH computation failed: {e}")
-        return {}
-
-
-def render_hodograph(vad_data: dict, output_path: Path) -> Path | None:
-    """Render Hodograph from VAD wind profile."""
-    try:
-        u = np.array(vad_data["u_wind"]) * munits("m/s")
-        v = np.array(vad_data["v_wind"]) * munits("m/s")
-        h = np.array(vad_data["height_m"]) * munits("m")
-
-        fig, ax = plt.subplots(figsize=(5, 5), dpi=90)
-        fig.patch.set_facecolor("#1c2b3a")
-        ax.set_facecolor("#1c2b3a")
-
-        h_obj = Hodograph(ax, component_range=50)
-        h_obj.add_grid(increment=10, color="white", alpha=0.2)
-        h_obj.plot_colormapped(u, v, h, cmap="jet")
-
-        ax.tick_params(colors="white")
-        for spine in ax.spines.values():
-            spine.set_edgecolor("#3a4a5c")
-
-        plt.title("VAD Hodograph", color="white", fontsize=10)
-        plt.tight_layout()
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=90, facecolor="#1c2b3a", bbox_inches="tight")
-        plt.close(fig)
-        return output_path
-    except Exception as e:
-        print(f"    Hodograph render failed: {e}")
         return None
 
 
@@ -404,10 +346,13 @@ def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None
             print(
                 f"    [SUCCESS] IEM returned active profile for {ts}Z with {levels_count} discrete levels."
             )
+            # guarantee surface-first ordering for all consumers
+            prof = profiles[0]["profile"]
+            prof.sort(key=lambda p: (p.get("hght") is None, p.get("hght") or 0))
             return {
                 "station": station,
                 "valid": profiles[0].get("valid"),
-                "profile": profiles[0]["profile"],
+                "profile": prof,
             }
         else:
             print(f"    [NOTICE] IEM payload contained 0 profiles for timestamp {ts}Z.")
@@ -421,6 +366,9 @@ def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None
             print(f"    [CACHE HIT] Found Wyoming file locally: {wyo_cache.name}")
             try:
                 result = json.loads(wyo_cache.read_text())
+                result["profile"].sort(
+                    key=lambda p: (p.get("hght") is None, p.get("hght") or 0)
+                )
                 print(
                     f"    [SUCCESS] Loaded cached Wyoming profile containing {len(result.get('profile', []))} levels."
                 )
@@ -473,6 +421,7 @@ def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None
                         }
                     )
 
+                profile.sort(key=lambda p: (p.get("hght") is None, p.get("hght") or 0))
                 result = {
                     "station": station,
                     "valid": dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -514,6 +463,7 @@ def compute_indices(sounding: dict) -> dict:
             for p in profile
             if all(p.get(k) is not None for k in ["pres", "hght", "tmpc", "dwpc"])
         ]
+        thermo.sort(key=lambda t: t[1])  # sort by height (index 1)
 
         # Filter to levels with wind data
         wind_levels = [
@@ -521,6 +471,10 @@ def compute_indices(sounding: dict) -> dict:
             for p in profile
             if all(p.get(k) is not None for k in ["pres", "drct", "sknt"])
         ]
+
+        # wind tuples are (pres, drct, sknt) - sort by pressure DESCENDING
+        # (highest pressure = surface first)
+        wind_levels.sort(key=lambda w: -w[0])
 
         if len(thermo) < 5:
             return {}

@@ -312,7 +312,8 @@ def _extract_warning_counties(warnings: list) -> list[tuple[str, str]]:
 
 
 def _fetch_ncei(
-    event_date: date,
+    start_utc: datetime,
+    end_utc: datetime,
     lat: float,
     lon: float,
     location_display_name: str,
@@ -320,15 +321,12 @@ def _fetch_ncei(
     radius_km: float = 250.0,
     progress: Callable[[str], None] | None = None,
 ) -> list[dict]:
-    """Fetch NCEI Storm Events near the event point."""
-
+    """Fetch NCEI Storm Events near the event point within the event window."""
     def _p(msg: str) -> None:
         print(msg)
         if progress:
             progress(msg)
 
-    # States for the coordless-record fallback: geocoded state plus any
-    # states appearing in warning locations
     fallback_states: set[str] = set()
     state, _ = geocoding._parse_state_county(location_display_name)
     if state:
@@ -337,10 +335,14 @@ def _fetch_ncei(
         for s, _county in _extract_warning_counties(warnings):
             fallback_states.add(s)
 
-    _p(f"  Fetching NCEI storm events within {radius_km:.0f} km on {event_date}...")
+    _p(
+        f"  Fetching NCEI storm events within {radius_km:.0f} km, "
+        f"{start_utc:%Y-%m-%d %H:%MZ} to {end_utc:%Y-%m-%d %H:%MZ}..."
+    )
     try:
         events = ncei.fetch_storm_events(
-            event_date=event_date,
+            start_utc=start_utc,
+            end_utc=end_utc,
             lat=lat,
             lon=lon,
             radius_km=radius_km,
@@ -349,7 +351,6 @@ def _fetch_ncei(
     except Exception as e:
         _p(f"  NCEI fetch failed: {e}")
         return []
-
     _p(f"    Found {len(events)} NCEI storm events total")
     return events
 
@@ -689,7 +690,8 @@ def run_pipeline(
     # Step 1b: fetch NCEI storm events
 
     ncei_events = _fetch_ncei(
-        event_date=start.date(),
+        start_utc=start,
+        end_utc=end,
         lat=zoom_lat,
         lon=zoom_lon,
         location_display_name=location,
