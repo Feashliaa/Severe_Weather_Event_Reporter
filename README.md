@@ -4,6 +4,8 @@ An AI-powered post-event severe weather report generator. Input a location, date
 
 The kind of breakdown that normally takes a meteorologist hours to assemble manually - automated down to about 2 minutes.
 
+![Animated NEXRAD radar loop - Moore, OK EF5, May 20 2013](docs/radar-loop.gif)
+
 ## The Problem
 
 Major events get coverage. EF4-5s, significant outbreaks, high-fatality events - NWS publishes service assessments, media writes them up, researchers document them. But the long tail doesn't. EF1-EF3s in rural counties, isolated hail events, derecho segments, marginally tornadic nights - they get a database entry and maybe a tweet. Weeks later, nobody can answer "what actually happened Tuesday night in [county]" without spending an hour piecing together IEM, NCEI, and S3 radar files manually.
@@ -15,13 +17,23 @@ This tool fills that gap.
 Each report includes:
 
 - **Impact summary card** - EF rating, fatalities, injuries, warning lead time, path length (DAT surveyed or NCEI), max reflectivity, echo tops, warning count, LSR count, and property damage at a glance
+
+![Impact summary card - Moore, OK 2013](docs/impact-summary.png)
+
 - **Warning lead time analysis** - minutes between the first tornado warning and the highest-rated tornado's touchdown, computed from VTEC issuance times and NCEI survey times, with data-quality flagging when sources conflict
 - **Outbreak context** - if the event falls within a NOAA Billion-Dollar Disaster, the report surfaces the outbreak name, total economic damage, and total deaths (1980-2024 archive)
 - **Pre-event sounding + VAD hodograph** - Skew-T log-P diagram with parcel path and CAPE/CIN shading alongside a VAD hodograph derived from event-time radar velocity data, plus computed indices (CAPE, CIN, 0-6km bulk shear, 0-1km SRH, 0-3km SRH, surface conditions)
+
+![Skew-T log-P sounding - OUN, May 20 2013 12Z](docs/sounding_skewt.png)
+![VAD hodograph](docs/hodograph.png)
+
 - **AI narrative** - structured overview, environmental context, storm evolution, warnings issued, and impacts. Written from extracted numeric radar features and structured warning/LSR/NCEI/sounding/DAT data, not hallucinated from images
 - **Animated radar loop** - reflectivity + velocity (+ correlation coefficient + spectrum width for 2013+ events), dark map background, county lines, city labels, event location marked
 - **Volume scan analysis table** - max dBZ, echo tops, velocity couplet, timestamped for each processed scan
 - **Interactive event map** - Leaflet map with SPC Day 1 convective outlook overlay, NWS DAT surveyed tornado tracks (with EF-comment override), warning polygons, LSR points, and NCEI straight-line fallback for unsurveyed events
+
+![Event map - Moore, OK 2013 with DAT track, warning polygons, and SPC outlook](docs/event-map.png)
+
 - **Active warnings section** - all VTEC warnings with issued/expired times, polygon coverage, forecaster
 - **Local storm reports** - deduplicated, polygon-filtered, color-coded by type
 - **NCEI Storm Survey data** - post-survey verified EF rating, path length/width, fatalities, injuries, property damage, full NWS event narrative
