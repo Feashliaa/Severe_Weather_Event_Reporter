@@ -230,7 +230,7 @@
                             <div class="text-red-600 text-xs uppercase tracking-wider font-bold mb-1">Fatalities</div>
                             <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
                                 {{ s.total_deaths }}</div>
-                            <div class="text-slate-500 text-xs mt-1">direct deaths</div>
+                            <div class="text-slate-500 text-xs mt-1">direct deaths ({{ s.impact_label }})</div>
                         </div>
                         {% endif %}
 
@@ -242,16 +242,6 @@
                             <div class="text-slate-500 text-xs mt-1">
                                 mi {% if s.path_source == 'NCEI' %}(longest county segment){% else %}(DAT surveyed){% endif %}
                             </div>
-                        </div>
-                        {% endif %}
-
-                        {% if s.max_path_mi %}
-                        <div class="border border-[#facc15] rounded p-3 text-center">
-                            <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Path Length
-                            </div>
-                            <div class="text-slate-900 text-3xl font-black" style="font-family: 'Oswald', sans-serif;">
-                                {{ s.max_path_mi }}</div>
-                            <div class="text-slate-500 text-xs mt-1">mi (longest county segment)</div>
                         </div>
                         {% endif %}
 
@@ -298,7 +288,7 @@
                         <div class="text-slate-900 text-2xl font-black" style="font-family: 'Oswald', sans-serif;">
                             ${{ "{:,.0f}".format(s.total_damage) }}
                         </div>
-                        <div class="text-slate-500 text-xs mt-1">Total NCEI Estimated Damage</div>
+                        <div class="text-slate-500 text-xs mt-1">NCEI estimated ({{ s.impact_label }})</div>
                     </div>
                     {% endif %}
 
@@ -501,7 +491,7 @@
                     <p class="text-xs text-slate-500 mt-2">
                         <span class="inline-block w-3 h-3 bg-red-600 mr-1"></span> Tornado Warning
                         <span class="inline-block w-3 h-3 bg-yellow-400 ml-3 mr-1"></span> Severe Thunderstorm Warning
-                        <span class="inline-block w-3 h-3 bg-red-900 ml-3 mr-1"></span> Tornado Track (NCEI)
+                        <span class="inline-block w-3 h-3 bg-red-900 ml-3 mr-1"></span> Tornado Track (DAT/NCEI)
                         <span class="inline-block w-3 h-3 rounded-full bg-blue-500 ml-3 mr-1"></span> LSR
                     </p>
                 </div>

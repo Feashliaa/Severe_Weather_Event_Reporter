@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, date as date_type
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from dataclasses import dataclass, asdict
 from fastapi import FastAPI, HTTPException, Request, Response, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
@@ -33,6 +34,22 @@ WEB_STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(WEB_STATIC_DIR)), name="static")
+
+
+@dataclass
+class PipelineParams:
+    slug: str
+    event_name: str
+    event_date: str
+    location: str
+    start_utc: datetime
+    end_utc: datetime
+    lat: float
+    lon: float
+    tz_name: str
+    zoom_km: float
+    max_radar_scans: int
+    lsr_search_km: float
 
 
 class ReportRequest(BaseModel):
@@ -182,12 +199,30 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
             "Another report is currently generating. Please wait a few minutes and try again.",
         )
 
+    params = PipelineParams(
+        slug=slug,
+        event_name=req.event_name,
+        event_date=event_date.strftime("%B %d, %Y"),
+        location=req.location,
+        start_utc=start_utc,
+        end_utc=end_utc,
+        lat=lat,
+        lon=lon,
+        tz_name=tz_name,
+        zoom_km=req.zoom_km,
+        max_radar_scans=req.max_radar_scans,
+        lsr_search_km=req.lsr_search_km,
+    )
+
     _jobs[slug] = {
         "status": "processing",
         "message": "Starting pipeline...",
         "estimated_seconds": int((req.max_radar_scans / 8) * 35 + 65),
         "error": None,
+        "params": params,
     }
+
+    background_tasks.add_task(_run_pipeline_job, **asdict(params))
 
     background_tasks.add_task(
         _run_pipeline_job,
@@ -206,6 +241,37 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
     )
 
     return RedirectResponse(url=f"/reports/{slug}/status", status_code=303)
+
+
+@app.post("/reports/{slug}/retry")
+async def retry_report(slug: str, background_tasks: BackgroundTasks):
+    """Re-run a failed pipeline using its original parameters."""
+    job = _jobs.get(slug)
+    if job is None or not job.get("params"):
+        raise HTTPException(
+            404,
+            "No job parameters found for this report. Submit it again from the home page.",
+        )
+    if job.get("status") == "processing":
+        return {"status": "already_running"}
+    if any(j.get("status") == "processing" for j in _jobs.values()):
+        raise HTTPException(
+            429, "Another report is currently generating. Please wait and try again."
+        )
+
+    params = job["params"]
+    if not isinstance(params, PipelineParams):
+        raise HTTPException(404, "No job parameters found for this report.")
+    
+    _jobs[slug] = {
+        "status": "processing",
+        "message": "Restarting pipeline...",
+        "estimated_seconds": int((params.max_radar_scans / 8) * 35 + 65),
+        "error": None,
+        "params": params,
+    }
+    background_tasks.add_task(_run_pipeline_job, **asdict(params))
+    return {"status": "restarted"}
 
 
 @app.get("/gallery")

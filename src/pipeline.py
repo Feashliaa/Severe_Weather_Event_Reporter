@@ -313,62 +313,45 @@ def _extract_warning_counties(warnings: list) -> list[tuple[str, str]]:
 
 def _fetch_ncei(
     event_date: date,
+    lat: float,
+    lon: float,
     location_display_name: str,
     warnings: list | None = None,
+    radius_km: float = 250.0,
     progress: Callable[[str], None] | None = None,
 ) -> list[dict]:
-    """Fetch NCEI Storm Events for the event date and location."""
+    """Fetch NCEI Storm Events near the event point."""
 
     def _p(msg: str) -> None:
         print(msg)
         if progress:
             progress(msg)
 
-    # Build list of (state, county) pairs to query
-    query_pairs: list[tuple[str, str]] = []
-
-    # Add counties from warning locations
+    # States for the coordless-record fallback: geocoded state plus any
+    # states appearing in warning locations
+    fallback_states: set[str] = set()
+    state, _ = geocoding._parse_state_county(location_display_name)
+    if state:
+        fallback_states.add(state)
     if warnings:
-        warning_counties = _extract_warning_counties(warnings)
-        query_pairs.extend(warning_counties)
+        for s, _county in _extract_warning_counties(warnings):
+            fallback_states.add(s)
 
-    # Fall back to geocoded location if no warning counties
-    if not query_pairs:
-        state, county = geocoding._parse_state_county(location_display_name)
-        if not state:
-            _p("  Skipping NCEI lookup (could not determine state from location)")
-            return []
-        query_pairs.append((state, county))  # type: ignore
+    _p(f"  Fetching NCEI storm events within {radius_km:.0f} km on {event_date}...")
+    try:
+        events = ncei.fetch_storm_events(
+            event_date=event_date,
+            lat=lat,
+            lon=lon,
+            radius_km=radius_km,
+            fallback_states=fallback_states,
+        )
+    except Exception as e:
+        _p(f"  NCEI fetch failed: {e}")
+        return []
 
-    _p(
-        f"  Fetching NCEI storm events for {len(query_pairs)} counties on {event_date}..."
-    )
-
-    all_events = []
-    seen_keys: set[tuple] = set()
-
-    for state, county in query_pairs:
-        try:
-            events = ncei.fetch_storm_events(
-                event_date=event_date,
-                state=state,
-                county=county,
-            )
-            for e in events:
-                key = (
-                    e.get("begin_time"),
-                    e.get("state"),
-                    e.get("county"),
-                    e.get("event_type"),
-                )
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    all_events.append(e)
-        except Exception as e:
-            _p(f"  NCEI fetch failed for {state}/{county}: {e}")
-
-    _p(f"    Found {len(all_events)} NCEI storm events total")
-    return all_events
+    _p(f"    Found {len(events)} NCEI storm events total")
+    return events
 
 
 def _filter_ncei_by_warnings(ncei_events: list, warnings: list) -> list:
@@ -471,7 +454,7 @@ def _process_radar(
     event_name: str,
     progress: Callable[[str], None] | None = None,
 ) -> tuple[list, list, dict]:
-    """Download and process radar scans. Returns (radar_features, radar_images)."""
+    """Download and process radar scans. Returns (radar_features, radar_images, dummy_dict)."""
 
     def _p(msg: str) -> None:
         print(msg)
@@ -482,7 +465,7 @@ def _process_radar(
     key_scans = nexrad.pick_key_scans(all_scans, max_scans=max_radar_scans)
     t0 = time.time()
     _p(f"  Downloading {len(key_scans)} scans...")
-    local_paths = nexrad.download_scans(key_scans)  # local paths
+    local_paths = nexrad.download_scans(key_scans)
     print(f"    Download took {time.time() - t0:.1f}s")
 
     t1 = time.time()
@@ -494,11 +477,7 @@ def _process_radar(
     results: dict[int, tuple[dict, str]] = {}
 
     with ProcessPoolExecutor(max_workers=workers) as ex:
-
-        vad_futures = (
-            ex.submit(sounding.extract_vad, local_paths[0]) if local_paths else None
-        )
-
+        # --- REMOVED VAD FUTURES TASK FROM POOL ---
         futures = {
             ex.submit(
                 _process_scan,
@@ -529,19 +508,11 @@ def _process_radar(
             if result is not None:
                 results[i] = result
 
-    vad_data = None
-    if vad_futures is not None:
-        try:
-            vad_data = vad_futures.result()
-        except Exception as e:
-            _p(f"    VAD extraction failed: {e}")
-
-    # Reassemble in original scan order, not completion order
+    # Reassemble in original scan order
     radar_features = [results[i][0] for i in sorted(results)]
     radar_images = [results[i][1] for i in sorted(results)]
 
     print(f"  Total render time: {time.time() - t1:.1f}s for {len(local_paths)} scans")
-
     _p("Cleaning up scan files...")
 
     # Clean up raw scan files
@@ -551,7 +522,21 @@ def _process_radar(
         except Exception:
             pass
 
-    return radar_features, radar_images, vad_data or {}
+    # Return empty dict for vad_data to preserve downstream return unpacking signatures
+    return radar_features, radar_images, {}
+
+
+def _generate_narrative_with_retry(report, attempts: int = 3) -> str | None:
+    for i in range(attempts):
+        try:
+            return generate_narrative(report)
+        except Exception as e:
+            wait = 5 * (2**i)  # 5s, 10s, 20s
+            print(f"  Narrative attempt {i + 1}/{attempts} failed: {e}")
+            if i < attempts - 1:
+                print(f"  Retrying in {wait}s...")
+                time.sleep(wait)
+    return None
 
 
 def _write_outputs(
@@ -607,6 +592,16 @@ def _write_outputs(
 # ---------------------------------------------------------------------------
 
 
+def make_slug(event_name: str) -> str:
+    slug = event_name.lower().strip()
+    slug = re.sub(r"[\s]+", "_", slug)  # whitespace runs -> single underscore
+    slug = re.sub(r"[^a-z0-9_-]", "", slug)  # strip everything else
+    slug = re.sub(r"_+", "_", slug).strip("_")  # collapse/trim underscores
+    if not slug:
+        slug = "event"
+    return slug
+
+
 def run_pipeline(
     event_name: str,
     event_date: str,
@@ -639,7 +634,7 @@ def run_pipeline(
         if progress:
             progress(msg)
 
-    slug = event_name.lower().replace(" ", "_")
+    slug = make_slug(event_name=event_name)
     event_output_dir = config.OUTPUT_DIR / slug
 
     if (event_output_dir / "report_data.json").exists() and not force:
@@ -695,6 +690,8 @@ def run_pipeline(
 
     ncei_events = _fetch_ncei(
         event_date=start.date(),
+        lat=zoom_lat,
+        lon=zoom_lon,
         location_display_name=location,
         warnings=warnings,
         progress=progress,
@@ -732,40 +729,55 @@ def run_pipeline(
         print("  Skipping radar (no coverage for this event)")
         radar_features, radar_images, vad_data = [], [], {}
 
-    # Step 2a: fetch pre-event sounding data - hodograph
+    # Step 2a: fetch pre-event sounding data - hodograph & skewt
     sounding_indices = {}
     sounding_image = None
-    vad_srh = {}
+    vad_srh = (
+        {}
+    )  # Retained for JSON schema compatibility if needed, populated by clean sounding
     hodograph_image = None
 
     if avail.radar:
         raw_sounding = sounding.fetch_sounding(zoom_lat, zoom_lon, start)
         if raw_sounding:
+            # 1. Compute CAPE, Shear, and true ambient SRH from the sounding
             sounding_indices = sounding.compute_indices(raw_sounding)
+            kinematics = sounding.compute_kinematics_from_sounding(raw_sounding)
+
+            # Map clean sounding kinematics to your existing vad_srh structure
+            if kinematics:
+                vad_srh = {
+                    "srh_01km": kinematics.get("srh_01km"),
+                    "srh_03km": kinematics.get("srh_03km"),
+                }
+
+            # 2. Render Skew-T
             sounding_img_path = images_dir / "sounding_skewt.png"
-            result = sounding.render_skewt(raw_sounding, sounding_img_path)
-            if result:
+            result_skewt = sounding.render_skewt(raw_sounding, sounding_img_path)
+            if result_skewt:
                 sounding_image = "images/sounding_skewt.png"
+
+            # 3. Render clean Ambient Hodograph from the sounding instead of radar VAD
+            hodo_path = images_dir / "hodograph.png"
+            result_hodo = sounding.render_hodograph_from_sounding(
+                raw_sounding, hodo_path
+            )
+            if result_hodo:
+                hodograph_image = "images/hodograph.png"
+
+            # 4. Consolidated Progress Logging
             if sounding_indices:
                 _progress(
                     f"  Sounding: CAPE={sounding_indices.get('cape_jkg')} J/kg, "
                     f"Shear={sounding_indices.get('bulk_shear_06km_kt')} kt"
                 )
-
-        # VAD hodograph (extracted in _process_radar from the first scan)
-        if vad_data:
-            vad_srh = sounding.compute_srh(vad_data)
-            hodo_path = images_dir / "hodograph.png"
-            result = sounding.render_hodograph(vad_data, hodo_path)
-            if result:
-                hodograph_image = "images/hodograph.png"
             if vad_srh:
                 _progress(
-                    f"  VAD: 0-1km SRH={vad_srh.get('srh_01km')} m^2/s^2, "
+                    f"  Sounding Winds: 0-1km SRH={vad_srh.get('srh_01km')} m^2/s^2, "
                     f"0-3km SRH={vad_srh.get('srh_03km')} m^2/s^2"
                 )
         else:
-            _progress("  VAD: no wind data available")
+            _progress("  Sounding: no environmental upper-air data available")
 
     # Step 2b: compute lead time if possible
     lead_time = compute_lead_time(
@@ -838,7 +850,11 @@ def run_pipeline(
     )
 
     _progress("Generating narrative...")
-    report.narrative = generate_narrative(report)
+    narrative = _generate_narrative_with_retry(report=report)
+    if narrative is None:
+        _progress("  Narrative generation failed; report saved without narrative")
+        narrative = ""
+    report.narrative = narrative
 
     # Step 4: write outputs
     _write_outputs(

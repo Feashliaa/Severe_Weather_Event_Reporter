@@ -1,12 +1,13 @@
 """Assembles the final HTML report from structured data + LLM narrative."""
 
-import json
+import json, re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 from collections import Counter
+from shapely.geometry import shape, Point
 
 from PIL import report
 import markdown
@@ -61,14 +62,15 @@ CRITICAL RULES:
 10. LEAD TIME: If lead time data is provided, include a dedicated paragraph in the
     warnings section discussing warning effectiveness and lead time.
 11. SOUNDING: If pre-event sounding data is provided, use it in the environmental context
-    section to explain WHY the atmosphere was favorable or unfavorable for severe weather.
-    Reference CAPE, CIN, and bulk shear by name and explain their significance.
-12. SOUNDING TIMING: If the sounding valid time is more than 6 hours before the event,
-    you MUST explicitly state that these were pre-convective morning conditions.
-    For soundings with low CAPE (<500 J/kg) taken in the morning before an afternoon
-    severe weather event, explicitly note that surface heating likely increased CAPE
-    dramatically by event time, and that the shear values are more representative of
-    the storm environment than the instability values.
+    section. Reference CAPE, CIN, and bulk shear by name and explain their significance.
+    The sounding station may be far from the event; treat the profile as regional context,
+    not the storm's inflow environment.
+12. SOUNDING LIMITATIONS: If CAPE appears low relative to the observed storm intensity,
+    state plainly that the sounding likely under-samples the warm-sector instability
+    (due to distance from the event, timing, or cold-season regimes where storms are
+    shear-driven with modest CAPE). Do NOT invent warming or destabilization mechanisms.
+    Never attribute instability growth to daytime surface heating for an event occurring
+    at night or in the cold season.
 13. VAD WINDS: If VAD wind profile data is provided, use it in the environmental context
     section alongside the sounding. VAD winds represent the actual storm-time kinematic
     environment and are more current than the balloon sounding. Reference SRH by name
@@ -99,11 +101,11 @@ def generate_narrative(report: EventReport) -> str:
         if lead_time.get("data_quality") == "uncertain":
             lead_time_section = f"""
     WARNING LEAD TIME:
-    Lead time calculation produced an implausible result ({abs(lead_time['lead_time_minutes'])} minutes before warning).
-    The NCEI begin time for this event may be incorrect.
+    Lead time could not be reliably determined (computed value: {lead_time['lead_time_minutes']} min,
+    method: {lead_time.get('method')}).
     First warning issued: {lead_time['first_warning_utc']}
-    Do not state a definitive lead time. Instead note in the warnings section that the NCEI begin time
-    appears inconsistent with the warning issuance time, and that actual lead time is uncertain.
+    Do not state a definitive lead time. Note in the warnings section that the lead time
+    could not be reliably computed from the available data.
     """
         elif lead_time["had_warning"]:
             lead_time_section = f"""
@@ -149,13 +151,13 @@ Note: This is outbreak-level data, not individual tornado damage.
                     hours_before = round(
                         (first_scan - sounding_dt).total_seconds() / 3600, 1
                     )
-                    if hours_before > 0:
+                    if hours_before > 1:
                         sounding_note = (
-                            f"This sounding was taken approximately {hours_before} hours before the event. "
-                            f"Atmospheric conditions, particularly instability and wind shear, may have changed "
-                            f"significantly by event time. For morning soundings with low CAPE, note that surface "
-                            f"heating typically increases CAPE dramatically by afternoon - the morning sounding "
-                            f"represents the pre-convective environment, not the storm environment."
+                            f"This sounding was taken approximately {hours_before} hours before the event "
+                            f"and may not represent the storm inflow environment. "
+                            f"Note any discrepancy factually; do not speculate about specific mechanisms "
+                            f"(such as surface heating) unless the event occurred in the afternoon following "
+                            f"a morning sounding."
                         )
                     else:
                         sounding_note = "This sounding was taken close to or during the event window."
@@ -353,6 +355,54 @@ def build_html_string(report: EventReport, local_timezone: str = "UTC") -> str:
     )
 
 
+def _ncei_tzinfo(event: dict):
+    """NCEI CZ_TIMEZONE is a fixed offset like 'CST-6', no DST."""
+    tz_str = event.get("cz_timezone", "") or ""
+    m = re.search(r"(-?\d+)\s*$", tz_str)
+    if m:
+        return timezone(timedelta(hours=int(m.group(1))))
+    return None  # fall back to UTC or flag
+
+
+def _ncei_sort_ts(e: dict) -> float:
+    dt = _parse_ncei_dt(e.get("begin_time", ""))
+    return dt.timestamp() if dt else float("inf")
+
+
+def _select_warning_for_touchdown(tornado_warnings, touchdown_pt, touchdown_utc):
+    """Earliest-issued tornado warning whose polygon contains the touchdown
+    point and which was in effect at touchdown time."""
+    covering = []
+    for w in tornado_warnings:
+        if not (w.get("issued_at") and w.get("expires_at") and w.get("polygon")):
+            continue
+        try:
+            issued = datetime.fromisoformat(w["issued_at"].replace("Z", "+00:00"))
+            expired = datetime.fromisoformat(w["expires_at"].replace("Z", "+00:00"))
+        except (ValueError, TypeError) as e:
+            print(f"  >>> parse fail {w.get('vtec_id')}: {e} raw={w['issued_at']!r}")
+            continue
+        if issued.tzinfo is None:
+            issued = issued.replace(tzinfo=ZoneInfo("UTC"))
+        if expired.tzinfo is None:
+            expired = expired.replace(tzinfo=ZoneInfo("UTC"))
+        in_window = issued <= touchdown_utc <= expired
+        try:
+            contains = shape(w["polygon"]).contains(touchdown_pt)
+        except Exception as e:
+            print(f"  >>> shape fail {w.get('vtec_id')}: {e}")
+            continue
+        print(
+            f"  >>> {w.get('vtec_id')}: issued={issued} expired={expired} "
+            f"touchdown={touchdown_utc} in_window={in_window} contains={contains}"
+        )
+        if in_window and contains:
+            covering.append((issued, w))
+    if not covering:
+        return None
+    return min(covering, key=lambda x: x[0])
+
+
 def compute_lead_time(
     warnings: list, ncei_events: list, lsrs: list, local_timezone: str = "UTC"
 ) -> dict | None:
@@ -365,15 +415,6 @@ def compute_lead_time(
     if not tornado_warnings:
         return None
 
-    first_warning_str = min(
-        w["issued_at"] for w in tornado_warnings if w.get("issued_at")
-    )
-    try:
-        first_warning = datetime.fromisoformat(first_warning_str.replace("Z", "+00:00"))
-    except (ValueError, TypeError):
-        return None
-
-    local_tz = ZoneInfo(local_timezone)
     ef_rank = {"EF0": 0, "EF1": 1, "EF2": 2, "EF3": 3, "EF4": 4, "EF5": 5, "EFU": -1}
 
     # Find dominant episode - most tornado records share this episode ID
@@ -381,70 +422,122 @@ def compute_lead_time(
     episodes = [e.get("episode_id") for e in tornado_events if e.get("episode_id")]
     dominant_episode = Counter(episodes).most_common(1)[0][0] if episodes else None
 
-    # Restrict to dominant episode if available
     candidates = (
         [e for e in tornado_events if e.get("episode_id") == dominant_episode]
         if dominant_episode
         else tornado_events
     )
 
-    best_tornado = max(
+    # Rank: strongest EF first, then earliest touchdown. Iterate until we find
+    # a segment whose touchdown we have warning-polygon coverage for.
+    ranked = sorted(
         candidates,
-        key=lambda e: ef_rank.get(e.get("tor_f_scale", ""), -1),
-        default=None,
+        key=lambda e: (
+            -ef_rank.get(e.get("tor_f_scale", ""), -1),
+            _ncei_sort_ts(e),
+        ),
     )
 
-    if best_tornado and best_tornado.get("begin_time"):
-        dt = _parse_ncei_dt(best_tornado["begin_time"])
-        if dt:
-            dt_utc = dt.replace(tzinfo=local_tz).astimezone(ZoneInfo("UTC"))
-            lead_minutes = (dt_utc - first_warning).total_seconds() / 60
+    selected = None
+    method = "window_min"
+    touchdown_utc = None
+    touchdown_pt = None
 
-            if lead_minutes < -30:
-                return {
-                    "lead_time_minutes": round(lead_minutes),
-                    "first_warning_utc": first_warning_str,
-                    "first_touchdown_utc": dt_utc.isoformat(),
-                    "had_warning": False,
-                    "data_quality": "uncertain",
-                }
+    for cand in ranked:
+        if not cand.get("begin_time"):
+            continue
+        dt = _parse_ncei_dt(cand["begin_time"])
+        if not dt:
+            continue
+        tz = _ncei_tzinfo(cand)
+        if tz is None:
+            tz = ZoneInfo(local_timezone)
+        td_utc = dt.replace(tzinfo=tz).astimezone(ZoneInfo("UTC"))
 
-            return {
-                "lead_time_minutes": round(lead_minutes),
-                "first_warning_utc": first_warning_str,
-                "first_touchdown_utc": dt_utc.isoformat(),
-                "had_warning": lead_minutes > 0,
-            }
+        lat = cand.get("begin_lat")
+        lon = cand.get("begin_lon")
+        if lat is None or lon is None:
+            # Keep as a touchdown-time fallback even without a point
+            if touchdown_utc is None:
+                touchdown_utc = td_utc
+            continue
+        pt = Point(float(lon), float(lat))
 
-    # Fall back to LSRs
-    for l in lsrs:
-        if l.get("event") == "TORNADO" and l.get("time"):
-            try:
-                dt = datetime.fromisoformat(l["time"].replace("Z", "+00:00"))
-                dt_utc = (
-                    dt.astimezone(ZoneInfo("UTC"))
-                    if dt.tzinfo
-                    else dt.replace(tzinfo=ZoneInfo("UTC"))
-                )
-                lead_minutes = (dt_utc - first_warning).total_seconds() / 60
-                if lead_minutes < -30:
-                    return {
-                        "lead_time_minutes": round(lead_minutes),
-                        "first_warning_utc": first_warning_str,
-                        "first_touchdown_utc": dt_utc.isoformat(),
-                        "had_warning": False,
-                        "data_quality": "uncertain",
-                    }
-                return {
-                    "lead_time_minutes": round(lead_minutes),
-                    "first_warning_utc": first_warning_str,
-                    "first_touchdown_utc": dt_utc.isoformat(),
-                    "had_warning": lead_minutes > 0,
-                }
-            except Exception:
-                pass
+        # Remember the best-ranked candidate as fallback touchdown
+        if touchdown_utc is None:
+            touchdown_utc = td_utc
+            touchdown_pt = pt
 
-    return None
+        result = _select_warning_for_touchdown(tornado_warnings, pt, td_utc)
+        if result:
+            issued, warning = result
+            selected = (issued, warning)
+            touchdown_utc = td_utc
+            touchdown_pt = pt
+            method = "polygon_match"
+            break
+
+    # Fall back to LSRs for touchdown time/point if NCEI gave us nothing
+    if touchdown_utc is None:
+        for l in lsrs:
+            if l.get("event") == "TORNADO" and l.get("time"):
+                try:
+                    dt = datetime.fromisoformat(l["time"].replace("Z", "+00:00"))
+                    touchdown_utc = (
+                        dt.astimezone(ZoneInfo("UTC"))
+                        if dt.tzinfo
+                        else dt.replace(tzinfo=ZoneInfo("UTC"))
+                    )
+                    if l.get("lat") is not None and l.get("lon") is not None:
+                        touchdown_pt = Point(float(l["lon"]), float(l["lat"]))
+                        result = _select_warning_for_touchdown(
+                            tornado_warnings, touchdown_pt, touchdown_utc
+                        )
+                        if result:
+                            issued, warning = result
+                            selected = (issued, warning)
+                            method = "polygon_match"
+                    break
+                except Exception:
+                    continue
+
+    if touchdown_utc is None:
+        return None
+
+    print(
+        f"  >>> touchdown_pt: {touchdown_pt}, method: {method}, "
+        f"warnings with polygon: {sum(1 for w in tornado_warnings if w.get('polygon'))}"
+    )
+
+    if selected is None:
+        # No polygon contained any candidate touchdown (pre-2007 event,
+        # missing geometry, discovery gap, or genuinely unwarned).
+        try:
+            first_warning_str = min(
+                w["issued_at"] for w in tornado_warnings if w.get("issued_at")
+            )
+            issued = datetime.fromisoformat(first_warning_str.replace("Z", "+00:00"))
+            selected = (issued, None)
+        except (ValueError, TypeError):
+            return None
+
+    issued, warning = selected
+    lead_minutes = (touchdown_utc - issued).total_seconds() / 60
+
+    out = {
+        "lead_time_minutes": round(lead_minutes),
+        "first_warning_utc": issued.isoformat(),
+        "first_touchdown_utc": touchdown_utc.isoformat(),
+        "had_warning": lead_minutes > 0,
+        "method": method,
+    }
+
+    if method != "polygon_match" or not (-5 <= lead_minutes <= 120):
+        out["data_quality"] = "uncertain"
+        if lead_minutes < -5:
+            out["had_warning"] = False
+
+    return out
 
 
 def _parse_ncei_dt(value: str) -> datetime | None:
@@ -474,38 +567,58 @@ def compute_summary(report: EventReport) -> dict:
     max_path = 0.0
     total_path = 0.0  # Added to track overall episode footprint
 
+    # Determine the dominant hazard for this report
+    type_counts = Counter(e.get("event_type") for e in report.ncei_events)
+    has_tornado = type_counts.get("Tornado", 0) > 0
+
+    if has_tornado:
+        impact_types = {"Tornado"}
+        impact_label = "tornadoes"
+    else:
+        # Non-tornado event: count the convective wind/hail family
+        impact_types = {
+            "Thunderstorm Wind",
+            "Hail",
+            "Flash Flood",
+            "Strong Wind",
+            "High Wind",
+            "Lightning",
+        }
+        impact_label = "severe weather"
+
     # Combined into a single loop over events for efficiency
     for e in report.ncei_events:
-        total_deaths += e.get("deaths_direct", 0) or 0
-        total_injuries += e.get("injuries_direct", 0) or 0
+        in_scope = e.get("event_type") in impact_types
+        if in_scope:
+            total_deaths += e.get("deaths_direct", 0) or 0
+            total_injuries += e.get("injuries_direct", 0) or 0
+            if e.get("damage_property"):
+                total_damage += e["damage_property"]
 
-        if e.get("damage_property"):
-            total_damage += e["damage_property"]
+            if e.get("tor_length_mi"):
+                try:
+                    length = float(e["tor_length_mi"])
+                    total_path += length  # Sum everything in the county episode
+                    if length > max_path:
+                        max_path = length
+                except (ValueError, TypeError):
+                    pass
 
-        if e.get("tor_length_mi"):
-            try:
-                length = float(e["tor_length_mi"])
-                total_path += length  # Sum everything in the county episode
-                if length > max_path:
-                    max_path = length
-            except (ValueError, TypeError):
-                pass
-
-        # Handle normalization for legacy 'F' scales and modern 'EF' scales
-        raw_scale = e.get("tor_f_scale")
-        if raw_scale:
-            # Clean string (e.g., "F5 " or "EF5" -> "5")
-            clean_rating = str(raw_scale).strip().replace("EF", "").replace("F", "")
-            try:
-                # Use the raw integer digit (0-5) as the rank baseline
-                rank = int(clean_rating)
-                if rank > max_ef_rank:
-                    max_ef_rank = rank
-                    max_ef = str(
-                        raw_scale
-                    ).strip()  # Preserves "F5" or "EF5" for the UI
-            except (ValueError, TypeError):
-                pass
+            # Handle normalization for legacy 'F' scales and modern 'EF' scales
+            raw_scale = e.get("tor_f_scale")
+            if raw_scale:
+                # Clean string (e.g., "F5 " or "EF5" -> "5")
+                clean_rating = str(raw_scale).strip().replace("EF", "").replace("F", "")
+                try:
+                    # Use the raw integer digit (0-5) as the rank baseline
+                    rank = int(clean_rating)
+                    if rank > max_ef_rank:
+                        max_ef_rank = rank
+                        max_ef = str(
+                            raw_scale
+                        ).strip()  # Preserves "F5" or "EF5" for the UI
+                except (ValueError, TypeError):
+                    pass
 
     radar_dbz = [
         f["max_reflectivity_dbz"]
@@ -546,6 +659,7 @@ def compute_summary(report: EventReport) -> dict:
     return {
         "max_ef": max_ef,  # Will now safely pass "F5" to your UI component!
         "total_deaths": total_deaths,
+        "impact_label": impact_label,
         "total_injuries": total_injuries,
         "total_damage": total_damage,
         "max_path_mi": dat_path_mi or round(max_path, 1) if max_path > 0 else None,

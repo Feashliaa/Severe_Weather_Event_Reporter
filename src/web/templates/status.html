@@ -57,11 +57,44 @@
             <div id="error-box" class="hidden border-t-2 border-red-600 bg-red-50 px-6 py-4">
                 <p class="text-sm font-bold text-red-700 uppercase tracking-wider">Pipeline Failed</p>
                 <p id="error-msg" class="text-xs text-red-600 font-mono mt-1"></p>
+                <button id="retry-btn"
+                    class="mt-3 bg-[#003a8c] text-white text-xs uppercase tracking-wider font-bold px-4 py-2 border-2 border-[#003a8c] hover:bg-yellow-400 hover:text-[#003a8c] transition-colors"
+                    style="font-family: 'Oswald', sans-serif;">
+                    Retry Report
+                </button>
             </div>
         </div>
     </div>
 
     <script>
+
+        const retryBtn = document.getElementById("retry-btn");
+
+        retryBtn.addEventListener("click", async () => {
+            retryBtn.disabled = true;
+            retryBtn.textContent = "Retrying...";
+            try {
+                const res = await fetch(`/reports/${slug}/retry`, { method: "POST" });
+                if (!res.ok) throw new Error(`Retry failed (${res.status})`);
+                // Reset UI to running state
+                errorBox.classList.add("hidden");
+                document.getElementById("spinner").classList.remove("hidden");
+                statusMsg.classList.remove("hidden");
+                statusMsg.textContent = "Restarting pipeline...";
+                progressBar.style.width = "0%";
+                progressLabel.textContent = "0%";
+                startTime = Date.now();
+                estimatedSeconds = null;
+                retryBtn.disabled = false;
+                retryBtn.textContent = "Retry Report";
+                poll();
+            } catch (e) {
+                retryBtn.disabled = false;
+                retryBtn.textContent = "Retry Report";
+                errorMsg.textContent = "Retry failed: " + e.message;
+            }
+        });
+        
         const slug = "{{ slug }}";
         const statusMsg = document.getElementById("status-msg");
         const errorBox = document.getElementById("error-box");

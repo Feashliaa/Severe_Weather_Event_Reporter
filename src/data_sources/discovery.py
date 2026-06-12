@@ -3,7 +3,7 @@
 Uses IEM's vtec_events_bypoint.py endpoint to find all NWS-issued
 warnings whose polygons contained a given lat/lon during the window.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from src import config
 from src.models import VTECEventRef
 
@@ -21,6 +21,12 @@ def discover_events(
     phenomena: tuple[str, ...] = ("TO", "SV"),
     significance: tuple[str, ...] = ("W",),
 ) -> list[VTECEventRef]:
+    
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+
     # Search center + 8 surrounding points in a 15km grid
     # This handles cases where the user's location is near but not inside
     # the warning polygon
@@ -53,11 +59,22 @@ def discover_events(
             if event.get("significance") not in sig_set:
                 continue
             issue_str = event.get("issue")
+            expire_str = event.get("expire")
+
             if not issue_str:
                 continue
+
             issue = datetime.fromisoformat(issue_str.replace("Z", "+00:00"))
+
             print(f"    Checking {event.get('phenomena')}.{event.get('significance')}.{event.get('eventid')} issued {issue} vs window [{start}, {end}]")
-            if issue < start or issue > end:
+
+            if expire_str:
+                expire = datetime.fromisoformat(expire_str.replace("Z", "+00:00"))
+            else:
+                expire = issue + timedelta(minutes=90)
+
+            if expire < start or issue > end:
+
                 print(f"      SKIPPED: outside window")
                 continue
             key = (event["wfo"], event["phenomena"], event["significance"], event["eventid"])

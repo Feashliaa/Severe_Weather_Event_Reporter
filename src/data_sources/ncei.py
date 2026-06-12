@@ -5,15 +5,11 @@ https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/
 
 Files are cached locally by year to avoid re-downloading.
 """
-import csv
-import gzip
-import io
-import re
+import csv, math, gzip, re, httpx
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import httpx
 
 from src import config
 
@@ -126,50 +122,59 @@ def _parse_ncei_datetime(value: str) -> datetime | None:
 
 def fetch_storm_events(
     event_date: date,
-    state: str,
-    county: str | None = None,
+    lat: float,
+    lon: float,
+    radius_km: float = 250.0,
+    fallback_states: set[str] | None = None,
     event_types: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Fetch NCEI Storm Events matching the given date, state, and optionally county.
+    """Fetch NCEI Storm Events near a point on a given date.
 
-    Args:
-        event_date: The date of the event
-        state: State name in uppercase (e.g., 'IOWA', 'OKLAHOMA')
-        county: County name in uppercase (e.g., 'ADAIR', 'GARFIELD'). Optional.
-        event_types: List of event types to filter (e.g., ['Tornado', 'Hail']).
-                     If None, returns all types.
-
-    Returns:
-        List of event dicts with standardized fields.
+    Coordinate-bearing records are matched against a bounding box around
+    (lat, lon). Records without coordinates (common for wind/hail/flood,
+    which NCEI logs by county zone) fall back to a state match.
     """
     cache_path = _download_year(event_date.year)
     if cache_path is None:
         print(f"  NCEI: no data file found for {event_date.year}")
         return []
 
+    dlat = radius_km / 111.0
+    dlon = radius_km / (111.0 * math.cos(math.radians(lat)))
+    lat_min, lat_max = lat - dlat, lat + dlat
+    lon_min, lon_max = lon - dlon, lon + dlon
+    states = {s.upper() for s in (fallback_states or set())}
+
+    def _in_box(la, lo) -> bool:
+        try:
+            la, lo = float(la), float(lo)
+        except (TypeError, ValueError):
+            return False
+        return lat_min <= la <= lat_max and lon_min <= lo <= lon_max
+
     results = []
     with gzip.open(cache_path, "rt", encoding="utf-8", errors="replace") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            # Filter by state
-            if row.get("STATE", "").upper() != state.upper():
+            if event_types and row.get("EVENT_TYPE", "") not in event_types:
                 continue
 
-            # Filter by county if provided
-            if county and county.upper() not in row.get("CZ_NAME", "").upper():
-                continue
-
-            # Filter by event type if provided
-            if event_types:
-                if row.get("EVENT_TYPE", "") not in event_types:
-                    continue
-
-            # Filter by date - check event date and day before (handles UTC boundary crossings)
             begin_dt = _parse_ncei_datetime(row.get("BEGIN_DATE_TIME", ""))
             if begin_dt is None:
                 continue
             if begin_dt.date() not in (event_date, event_date - timedelta(days=1)):
                 continue
+
+            has_coords = bool(row.get("BEGIN_LAT")) or bool(row.get("END_LAT"))
+            if has_coords:
+                if not (
+                    _in_box(row.get("BEGIN_LAT"), row.get("BEGIN_LON"))
+                    or _in_box(row.get("END_LAT"), row.get("END_LON"))
+                ):
+                    continue
+            else:
+                if row.get("STATE", "").upper() not in states:
+                    continue
 
             results.append({
                 "event_type": row.get("EVENT_TYPE"),
@@ -182,6 +187,7 @@ def fetch_storm_events(
                 "tor_width_yd": row.get("TOR_WIDTH"),
                 "episode_id": row.get("EPISODE_ID"),
                 "event_id": row.get("EVENT_ID"),
+                "cz_timezone": row.get("CZ_TIMEZONE"),
                 "deaths_direct": int(row.get("DEATHS_DIRECT") or 0),
                 "deaths_indirect": int(row.get("DEATHS_INDIRECT") or 0),
                 "injuries_direct": int(row.get("INJURIES_DIRECT") or 0),

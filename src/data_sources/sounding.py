@@ -7,7 +7,7 @@ With that it renders a Skew-T diagram and a report of the indices.
 """
 
 import math, httpx, pyart, matplotlib, json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -30,7 +30,7 @@ from siphon.simplewebservice.wyoming import WyomingUpperAir
 RAOB_ENDPOINT = "https://mesonet.agron.iastate.edu/json/raob.py"
 SOUNDING_CACHE_DIR = config.CACHE_DIR / "soundings"
 
-# CONUS upper air stations — ICAO id, lat, lon
+# CONUS upper air stations - ICAO id, lat, lon
 # Source: NWS upper air network, stable since ~1990
 _UA_STATIONS = [
     ("BNA", 36.25, -86.57),  # Nashville TN
@@ -106,6 +106,116 @@ _UA_STATIONS = [
     ("MHX", 34.78, -76.88),  # Newport NC
     ("RAX", 35.66, -78.49),  # Raleigh NC
 ]
+
+
+def compute_kinematics_from_sounding(sounding_data: dict) -> dict:
+    """Compute true ambient SRH parameters using modern MetPy core signatures."""
+    try:
+        profile = sounding_data["profile"]
+
+        # Filter layers missing critical data
+        valid_levels = [
+            l
+            for l in profile
+            if l["hght"] is not None and l["drct"] is not None and l["sknt"] is not None
+        ]
+        if not valid_levels:
+            print("    [ERROR] Sounding kinematic engine found 0 valid height records.")
+            return {}
+
+        # 1. Parse arrays and append strict units
+        heights = np.array([l["hght"] for l in valid_levels]) * munits.m
+        directions = np.array([l["drct"] for l in valid_levels]) * munits.deg
+        speeds = np.array([l["sknt"] for l in valid_levels]) * munits.knots
+
+        # 2. Deconstruct speeds/directions into U/V components
+        u, v = mpcalc.wind_components(speeds, directions)
+
+        # 3. Create dummy pressure array needed for the modern Bunkers signature
+        # (bunkers_storm_motion requires: pressure, u, v, height)
+        # We can extract actual pressures if available, or fake it safely for standard heights
+        pressures = (
+            np.array(
+                [
+                    l["pres"] if l["pres"] is not None else 1000.0 - (idx * 5)
+                    for idx, l in enumerate(valid_levels)
+                ]
+            )
+            * munits.hPa
+        )
+
+        # 4. Extract Bunkers Storm Motion Vectors
+        # Returns: (right_mover, left_mover, wind_mean)
+        bunkers_output = mpcalc.bunkers_storm_motion(pressures, u, v, heights)
+        bunkers_right = bunkers_output[0]  # Index 0 is Right Mover [u_comp, v_comp]
+
+        # Extract strict dimensional U and V motion velocities
+        bunkers_u = bunkers_right[0]
+        bunkers_v = bunkers_right[1]
+
+        # 5. Compute SRH using modern keyword-only storm_u and storm_v definitions
+        # Returns tuple: (positive_srh, negative_srh, total_srh)
+        srh_01_tuple = mpcalc.storm_relative_helicity(
+            heights, u, v, depth=1000 * munits.m, storm_u=bunkers_u, storm_v=bunkers_v
+        )
+
+        srh_03_tuple = mpcalc.storm_relative_helicity(
+            heights, u, v, depth=3000 * munits.m, storm_u=bunkers_u, storm_v=bunkers_v
+        )
+
+        # Index [2] returns Total SRH magnitude
+        return {
+            "srh_01km": round(float(srh_01_tuple[2].magnitude)),
+            "srh_03km": round(float(srh_03_tuple[2].magnitude)),
+        }
+
+    except Exception as e:
+        print(f"    Sounding kinematics calculation failed: {e}")
+        return {}
+
+
+def render_hodograph_from_sounding(
+    sounding_data: dict, output_path: Path
+) -> Path | None:
+    """Render a clean environmental Hodograph using the RAOB sounding data."""
+    try:
+        profile = sounding_data["profile"]
+        valid_levels = [
+            l
+            for l in profile
+            if l["hght"] is not None and l["drct"] is not None and l["sknt"] is not None
+        ]
+        if not valid_levels:
+            return None
+
+        heights = np.array([l["hght"] for l in valid_levels]) * munits.m
+        directions = np.array([l["drct"] for l in valid_levels]) * munits.deg
+        speeds = np.array([l["sknt"] for l in valid_levels]) * munits.knots
+
+        u, v = mpcalc.wind_components(speeds, directions)
+
+        fig, ax = plt.subplots(figsize=(5, 5), dpi=90)
+        fig.patch.set_facecolor("#1c2b3a")
+        ax.set_facecolor("#1c2b3a")
+
+        h_obj = Hodograph(ax, component_range=60)
+        h_obj.add_grid(increment=10, color="white", alpha=0.2)
+        h_obj.plot_colormapped(u, v, heights, cmap="jet")
+
+        ax.tick_params(colors="white")
+        for spine in ax.spines.values():
+            spine.set_edgecolor("#3a4a5c")
+
+        plt.title(f"{sounding_data['station']} Hodograph", color="white", fontsize=10)
+        plt.tight_layout()
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=90, facecolor="#1c2b3a", bbox_inches="tight")
+        plt.close(fig)
+        return output_path
+    except Exception as e:
+        print(f"    Sounding Hodograph render failed: {e}")
+        return None
 
 
 def extract_vad(radar_path: Path) -> dict | None:
@@ -194,114 +304,138 @@ def _nearest_station(lat: float, lon: float) -> str | None:
 
 
 def _pick_sounding_time(event_start: datetime) -> list[str]:
-    """Return candidate sounding times to try, in preference order."""
+    """Return candidate sounding times to try, in preference order.
+
+    Generates an aggressive cascade of 4 standard RAOB cycles (00Z, 12Z, 18Z)
+    to handle convective contamination gracefully.
+    """
     hour = event_start.hour
-    date = event_start.strftime("%Y%m%d")
-    prev_date = (event_start - timedelta(days=1)).strftime("%Y%m%d")
+    base_date = event_start.date()
+
+    dt_00z = datetime.combine(base_date, datetime.min.time())
+    dt_12z = datetime.combine(base_date, time(12, 0))
 
     if hour < 12:
-        return [f"{date}00", f"{prev_date}12"]
+        # Event is overnight UTC (e.g., 00:45Z on the 25th)
+        prev_day = base_date - timedelta(days=1)
+        dt_prev_12z = datetime.combine(prev_day, time(hour=12))
+        dt_prev_18z = datetime.combine(prev_day, time(hour=18))
+
+        # 00Z is the absolute target window here (matches the write-up's chart)
+        return [
+            dt_00z.strftime(
+                "%Y%m%d%H"
+            ),  # 1. Day-of 00Z (Captured just before/at event window)
+            dt_prev_18z.strftime("%Y%m%d%H"),  # 2. Late afternoon ambient air
+            dt_prev_12z.strftime("%Y%m%d%H"),  # 3. Morning baseline
+            dt_12z.strftime("%Y%m%d%H"),  # 4. Last resort fallback
+        ]
     else:
-        return [f"{date}12", f"{date}00"]
+        # Event is afternoon/evening UTC (e.g., 18:00Z on the 24th)
+        dt_18z = datetime.combine(base_date, time(18, 0))
+        next_00z = dt_00z + timedelta(days=1)
 
-
-def _fetch_wyoming(station: str, dt: datetime) -> dict | None:
-    """Fetch sounding from University of Wyoming via siphon."""
-    try:
-        df = WyomingUpperAir.request_data(dt, station)
-        if df is None or df.empty:
-            return None
-
-        profile = []
-        for _, row in df.iterrows():
-            profile.append(
-                {
-                    "pres": (
-                        float(row["pressure"]) if not pd.isna(row["pressure"]) else None
-                    ),
-                    "hght": (
-                        float(row["height"]) if not pd.isna(row["height"]) else None
-                    ),
-                    "tmpc": (
-                        float(row["temperature"])
-                        if not pd.isna(row["temperature"])
-                        else None
-                    ),
-                    "dwpc": (
-                        float(row["dewpoint"]) if not pd.isna(row["dewpoint"]) else None
-                    ),
-                    "drct": (
-                        float(row["direction"])
-                        if not pd.isna(row["direction"])
-                        else None
-                    ),
-                    "sknt": float(row["speed"]) if not pd.isna(row["speed"]) else None,
-                }
-            )
-
-        return {
-            "station": station,
-            "valid": dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "profile": profile,
-        }
-    except Exception as e:
-        print(f"  Wyoming sounding fetch failed: {e}")
-        return None
+        # Preference:
+        # 1. Day-of 12Z
+        # 2. Day-of 18Z
+        # 3. Day-of 00Z
+        # 4. Next-day 00Z
+        return [
+            dt_12z.strftime("%Y%m%d%H"),
+            dt_18z.strftime("%Y%m%d%H"),
+            dt_00z.strftime("%Y%m%d%H"),
+            next_00z.strftime("%Y%m%d%H"),
+        ]
 
 
 def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None:
-    """Fetch nearest pre-event sounding. Returns parsed profile dict or None."""
+    """Fetch nearest pre-event sounding with extensive diagnostic logging."""
+    print(f"\n[SOUNDING DIAGNOSTIC] Starting lookup for Coords: ({lat}, {lon})")
+    print(
+        f"[SOUNDING DIAGNOSTIC] Event start timestamp parsed: {event_start.strftime('%Y-%m-%d %H:%M:%SZ')}"
+    )
 
     station = _nearest_station(lat, lon)
     if station is None:
-        print("  Sounding: no station found")
+        print("  [ERROR] Sounding: no station found near coordinates.")
         return None
+    print(f"[SOUNDING DIAGNOSTIC] Nearest upper-air station determined: {station}")
 
     SOUNDING_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    candidates = _pick_sounding_time(event_start)
+    print(f"[SOUNDING DIAGNOSTIC] Generated candidate cascade order: {candidates}")
 
-    for ts in _pick_sounding_time(event_start):
+    for idx, ts in enumerate(candidates, start=1):
         dt = datetime.strptime(ts, "%Y%m%d%H").replace(tzinfo=timezone.utc)
+        print(f"\n  --- Trying Candidate #{idx}: {ts}Z ---")
 
-        # Try IEM
-        print(f"  Fetching sounding for {station} at {ts}Z (IEM)...")
+        # ==========================================
+        # 1. TRY IEM
+        # ==========================================
         iem_cache = SOUNDING_CACHE_DIR / f"{station}_{ts}.json"
         if iem_cache.exists():
-            data = json.loads(iem_cache.read_text())
+            print(f"    [CACHE HIT] Found IEM file locally: {iem_cache.name}")
+            try:
+                data = json.loads(iem_cache.read_text())
+            except Exception as e:
+                print(f"    [CACHE ERROR] Failed reading IEM cache json: {e}")
+                data = {"profiles": []}
         else:
+            print(f"    [CACHE MISS] Fetching from IEM API: {RAOB_ENDPOINT}")
+            print(f"    [API URL] {RAOB_ENDPOINT}?ts={ts}&station={station}&fmt=json")
             try:
                 r = httpx.get(
                     RAOB_ENDPOINT,
                     params={"ts": ts, "station": station, "fmt": "json"},
                     timeout=30.0,
                 )
+                print(f"    [API RESPONSE] Status Code: {r.status_code}")
                 r.raise_for_status()
                 data = r.json()
                 iem_cache.write_text(r.text)
+                print(f"    [CACHE WRITE] Saved IEM payload to disk.")
             except Exception as e:
-                print(f"  IEM fetch failed: {e}")
+                print(f"    [API ERROR] IEM HTTP execution failed: {e}")
                 data = {"profiles": []}
 
         profiles = data.get("profiles", [])
         if profiles:
+            levels_count = len(profiles[0].get("profile", []))
             print(
-                f"  Sounding: got IEM profile with {len(profiles[0]['profile'])} levels"
+                f"    [SUCCESS] IEM returned active profile for {ts}Z with {levels_count} discrete levels."
             )
             return {
                 "station": station,
                 "valid": profiles[0].get("valid"),
                 "profile": profiles[0]["profile"],
             }
+        else:
+            print(f"    [NOTICE] IEM payload contained 0 profiles for timestamp {ts}Z.")
 
-        # IEM missed — try Wyoming for same time
-        print(f"  IEM empty for {ts}, trying Wyoming...")
+        # ==========================================
+        # 2. TRY WYOMING FALLBACK
+        # ==========================================
+        print(f"    [FALLBACK] Transitioning to Wyoming request protocol for {ts}Z...")
         wyo_cache = SOUNDING_CACHE_DIR / f"{station}_{ts}_wyoming.json"
         if wyo_cache.exists():
-            result = json.loads(wyo_cache.read_text())
-            print(f"  Sounding: loaded Wyoming cache for {station} {ts}")
-            return result
+            print(f"    [CACHE HIT] Found Wyoming file locally: {wyo_cache.name}")
+            try:
+                result = json.loads(wyo_cache.read_text())
+                print(
+                    f"    [SUCCESS] Loaded cached Wyoming profile containing {len(result.get('profile', []))} levels."
+                )
+                return result
+            except Exception as e:
+                print(f"    [CACHE ERROR] Failed reading Wyoming cache json: {e}")
+
         try:
+            print(f"    [NETWORK] Querying Siphon WyomingUpperAir engine for {dt}...")
             df = WyomingUpperAir.request_data(dt, station)
+
             if df is not None and not df.empty:
+                print(
+                    f"    [NETWORK SUCCESS] Wyoming returned DataFrame. Row count: {len(df)}"
+                )
                 profile = []
                 for _, row in df.iterrows():
                     profile.append(
@@ -338,6 +472,7 @@ def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None
                             ),
                         }
                     )
+
                 result = {
                     "station": station,
                     "valid": dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -345,16 +480,26 @@ def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None
                     "source": "wyoming",
                 }
                 wyo_cache.write_text(json.dumps(result))
-                print(f"  Sounding: got Wyoming profile with {len(profile)} levels")
+                print(
+                    f"    [SUCCESS] Parsed and saved Wyoming profile with {len(profile)} levels."
+                )
                 return result
             else:
-                print(f"  Wyoming: no data for {station} {ts}")
+                print(
+                    f"    [NOTICE] Wyoming engine returned an empty/None dataset for {station} at {ts}Z."
+                )
         except Exception as e:
-            print(f"  Wyoming fetch failed for {station} {ts}: {e}")
+            print(
+                f"    [API ERROR] Siphon Wyoming engine execution failed for {station} {ts}Z: {e}"
+            )
 
-        print(f"  Both IEM and Wyoming missed {ts}, trying next candidate...")
+        print(
+            f"  [CYCLE WRAP] Candidate {ts}Z exhausted. Moving to next sequence entry..."
+        )
 
-    print(f"  Sounding: no data found across IEM and Wyoming for {station}")
+    print(
+        f"\n[FATAL] Sounding loop complete. Exhausted all candidates without acquiring data."
+    )
     return None
 
 
@@ -410,7 +555,7 @@ def compute_indices(sounding: dict) -> dict:
             # Find surface and ~6km level
             sfc_u, sfc_v = float(u[0].magnitude), float(v[0].magnitude)
 
-            # Find wind at ~6km — use pressure ~500 hPa as proxy
+            # Find wind at ~6km - use pressure ~500 hPa as proxy
             idx_500 = np.argmin(np.abs(wpres.magnitude - 500))
             top_u = float(u[idx_500].magnitude)
             top_v = float(v[idx_500].magnitude)
