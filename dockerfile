@@ -1,8 +1,40 @@
-# Pre-download Cartopy Natural Earth shapefiles
-RUN python -c " \
-import cartopy.io.shapereader as shpreader; \
-shpreader.natural_earth(resolution='10m', category='cultural', name='admin_2_counties'); \
-shpreader.natural_earth(resolution='50m', category='cultural', name='admin_1_states_provinces_lines'); \
-shpreader.natural_earth(resolution='10m', category='cultural', name='populated_places'); \
-print('Cartopy shapefiles downloaded.') \
-"
+FROM python:3.12-slim
+
+# System dependencies for Cartopy, Py-ART, and geopandas
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libgeos-dev \
+    libproj-dev \
+    proj-data \
+    proj-bin \
+    libhdf5-dev \
+    libnetcdf-dev \
+    libeccodes-dev \
+    libgdal-dev \
+    gdal-bin \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies first (layer caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY scripts/ ./scripts/
+RUN python scripts/download_cartopy.py
+
+# Copy source code
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY events/ ./events/
+COPY .env.example ./.env.example
+COPY tailwind.config.js ./tailwind.config.js
+
+# Cache and output dirs, these will be mounted as volumes in production
+RUN mkdir -p .cache output
+
+# Expose port
+EXPOSE 8000
+
+CMD ["uvicorn", "src.web.app:app", "--host", "0.0.0.0", "--port", "8000"]
