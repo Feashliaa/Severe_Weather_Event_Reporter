@@ -46,8 +46,8 @@ Each report includes:
 | IEM Mesonet                                  | VTEC warning archive, storm-based warning polygons, LSRs, RAOB soundings                         |
 | University of Wyoming Upper Air Archive      | Sounding fallback when IEM archive has gaps (via siphon)                                         |
 | NCEI Storm Events Database                   | Post-survey EF ratings, path dimensions, casualties, damage estimates, episode IDs               |
-| NWS Damage Assessment Toolkit (DAT)          | Surveyed tornado track geometry — real curved multi-point paths, variable-width damage corridors |
-| SPC Convective Outlook Archive               | Day 1 categorical outlook overlay — GeoJSON (2020+), shapefile fallback (2003+)                  |
+| NWS Damage Assessment Toolkit (DAT)          | Surveyed tornado track geometry - real curved multi-point paths, variable-width damage corridors |
+| SPC Convective Outlook Archive               | Day 1 categorical outlook overlay - GeoJSON (2020+), shapefile fallback (2003+)                  |
 | NOAA Billion-Dollar Disasters                | Outbreak-level economic damage and death tolls, 1980-2024 (discontinued, archived locally)       |
 | OSM Nominatim                                | Geocoding + location autocomplete                                                                |
 
@@ -205,7 +205,7 @@ severe_weather_event_reporter/
 
 ## License
 
-MIT License with Commons Clause. Free for personal use and self-hosting. Commercial use requires a separate license — contact [your email here].
+MIT License with Commons Clause. Free for personal use and self-hosting. Commercial use requires a separate license - contact [rwdorrington@gmail.com].
 
 See [LICENSE](LICENSE) for full terms.
 
