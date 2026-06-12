@@ -373,28 +373,28 @@ def _fetch_ncei(
 
 def _filter_ncei_by_warnings(ncei_events: list, warnings: list) -> list:
     """Filter NCEI events to those who's coordinates actually fall within the warning polygons
-        Has fallbacks if warnings were too late.
+    Has fallbacks if warnings were too late.
     """
     if not warnings:
-        return ncei_events # let the llm figure it out the best it can
-    
+        return ncei_events  # let the llm figure it out the best it can
+
     polygons = []
     for w in warnings:
-        if w.get('polygon'):
+        if w.get("polygon"):
             try:
-                polygons.append(shape(w['polygon']))
+                polygons.append(shape(w["polygon"]))
             except Exception:
                 pass
-    
+
     if not polygons:
-        return ncei_events # warnings exist but no polygons
-    
+        return ncei_events  # warnings exist but no polygons
+
     filtered = []
     unmatched = []
 
     for e in ncei_events:
-        blat = e.get('begin_lat')
-        blon = e.get('begin_lon')
+        blat = e.get("begin_lat")
+        blon = e.get("begin_lon")
         if not blat or not blon:
             filtered.append(e)
             continue
@@ -408,15 +408,16 @@ def _filter_ncei_by_warnings(ncei_events: list, warnings: list) -> list:
             filtered.append(e)
 
     if not filtered:
-        return ncei_events # filter removed everything, return original
-    
+        return ncei_events  # filter removed everything, return original
+
     for e in unmatched:
-        scale = e.get('tor_f_scale', '')
-        ef_rank = {'EF3':3, 'EF4':4, 'EF5':5, 'F3':3, 'F4':4, 'F5':5}
+        scale = e.get("tor_f_scale", "")
+        ef_rank = {"EF3": 3, "EF4": 4, "EF5": 5, "F3": 3, "F4": 4, "F5": 5}
         if ef_rank.get(scale, 0) >= 3:
             filtered.append(e)
 
     return filtered
+
 
 def _process_scan(
     path: Path,
@@ -482,7 +483,10 @@ def _process_radar(
     print(f"    Download took {time.time() - t0:.1f}s")
 
     t1 = time.time()
-    max_workers_env = int(os.environ.get('RADAR_MAX_WORKERS', os.cpu_count() or 4))
+    max_workers_env = int(os.environ.get("RADAR_MAX_WORKERS", os.cpu_count() or 4))
+    print(
+        f"  RADAR_MAX_WORKERS env: {os.environ.get('RADAR_MAX_WORKERS')} -> using {max_workers_env} workers"
+    )
     workers = min(len(local_paths), max_workers_env)
     results: dict[int, tuple[dict, str]] = {}
 
