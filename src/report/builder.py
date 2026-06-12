@@ -279,10 +279,9 @@ Interpret trends:
 - High-reflectivity core descent (Max dBZ spikes while height of max reflectivity drops) = significant hail core descent or low-level debris ball signature during maximum tornadic intensity.
 - Strong velocity couplet = mesocyclone rotation.
 CRITICAL RADAR CONSTRAINT:
-If max inbound and outbound velocities show identical, repeating values across multiple timestamps (e.g., exactly 65.1 knots),
-do NOT describe the rotation as "static" or "stable." Interpret this as the mesocyclone completely saturating or
-exceeding the radar's maximum unambiguous velocity threshold (the Nyquist limit),
-proving the actual rotational winds were higher than the instrument could natively measure.
+If max velocities pin at an identical repeating value across scans, note ONCE that
+velocities reached the radar's effective measurement limit (Nyquist), and do not
+repeat or elaborate on this point. Do not claim it "proves" higher winds.
 {json.dumps(report.radar_features, indent=2, default=str)}
 
 --- ATMOSPHERIC CONTEXT ---
