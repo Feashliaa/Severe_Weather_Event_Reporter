@@ -186,7 +186,6 @@ severe_weather_event_reporter/
 - Storm-relative velocity (SRV) product
 - Automated tests
 - About page
-- Dockerize + Railway deployment
 - Google OAuth + tiered accounts (free/monthly/lifetime)
 - Stripe integration
 - Cache eviction policy (tiered by EF rating)
