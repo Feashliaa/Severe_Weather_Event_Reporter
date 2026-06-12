@@ -4,7 +4,7 @@ Orchestrates data fetching, radar processing, and LLM narrative generation.
 Each step is extracted into a helper function for testability and clarity.
 """
 
-import json, re, math, time, os, psutil, sys
+import json, re, math, time, os, psutil
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
@@ -30,7 +30,6 @@ from src.radar import processor as radar_processor
 from src.radar import renderer as radar_renderer
 from src.report.builder import EventReport, generate_narrative, compute_lead_time
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from multiprocessing import get_context
 
 
 from typing import Callable
@@ -506,10 +505,7 @@ def _process_radar(
         except Exception as e:
             print(f"    VAD extraction failed: {e}")
 
-    # determine what platform its on
-    mp_context = get_context('fork') if sys.platform == 'linux' else get_context('spawn')
-
-    with ProcessPoolExecutor(max_workers=workers, mp_context=mp_context) as ex:
+    with ProcessPoolExecutor(max_workers=workers) as ex:
         _log_memory("Before Process Scan")
         futures = {
             ex.submit(
