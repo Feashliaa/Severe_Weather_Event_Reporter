@@ -4,7 +4,7 @@ Orchestrates data fetching, radar processing, and LLM narrative generation.
 Each step is extracted into a helper function for testability and clarity.
 """
 
-import json, re, math, time, os
+import json, re, math, time, os, psutil, sys
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
@@ -30,6 +30,7 @@ from src.radar import processor as radar_processor
 from src.radar import renderer as radar_renderer
 from src.report.builder import EventReport, generate_narrative, compute_lead_time
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import get_context
 
 
 from typing import Callable
@@ -91,6 +92,10 @@ STATE_ABBR = {
     "WY": "WYOMING",
 }
 
+def _log_memory(label: str):
+    process = psutil.Process(os.getpid())
+    mem_mb = process.memory_info().rss / 1024 / 1024
+    print(f"    [MEM] {label}: {mem_mb:.0f} MB (main process)")
 
 def _geocode_location(
     location: str,
@@ -430,7 +435,9 @@ def _process_scan(
     event_name: str | None,
 ) -> tuple[dict, str] | None:
     """Process a single radar scan. Runs in a worker process."""
+    _log_memory("Before Process Scan")
     try:
+        _log_memory("In Process Scan")
         features = radar_processor.extract_features(path)
         ts_safe = features.timestamp.replace(":", "-").replace(".", "-")[:19]
         img_path = images_dir / f"{ts_safe}_reflectivity.png"
@@ -475,6 +482,8 @@ def _process_radar(
         if progress:
             progress(msg)
 
+    _log_memory("Before Process Radar")
+
     all_scans = nexrad.list_scans(radar_site, start, end)
     key_scans = nexrad.pick_key_scans(all_scans, max_scans=max_radar_scans)
     t0 = time.time()
@@ -497,7 +506,11 @@ def _process_radar(
         except Exception as e:
             print(f"    VAD extraction failed: {e}")
 
-    with ProcessPoolExecutor(max_workers=workers) as ex:
+    # determine what platform its on
+    mp_context = get_context('fork') if sys.platform == 'linux' else get_context('spawn')
+
+    with ProcessPoolExecutor(max_workers=workers, mp_context=mp_context) as ex:
+        _log_memory("Before Process Scan")
         futures = {
             ex.submit(
                 _process_scan,
@@ -541,6 +554,7 @@ def _process_radar(
         except Exception:
             pass
 
+    _log_memory("After Process Radar")
     return radar_features, radar_images, local_paths, vad_data or {}
 
 
