@@ -91,10 +91,6 @@ STATE_ABBR = {
     "WY": "WYOMING",
 }
 
-def _log_memory(label: str):
-    process = psutil.Process(os.getpid())
-    mem_mb = process.memory_info().rss / 1024 / 1024
-    print(f"    [MEM] {label}: {mem_mb:.0f} MB (main process)")
 
 def _geocode_location(
     location: str,
@@ -424,6 +420,8 @@ def _filter_ncei_by_warnings(ncei_events: list, warnings: list) -> list:
 
 
 def _process_scan(
+    scan_index: int,
+    stagger_slots: int,
     path: Path,
     images_dir: Path,
     zoom_lat: float,
@@ -434,9 +432,8 @@ def _process_scan(
     event_name: str | None,
 ) -> tuple[dict, str] | None:
     """Process a single radar scan. Runs in a worker process."""
-    _log_memory("Before Process Scan")
+    time.sleep((scan_index % stagger_slots) * 2.0)
     try:
-        _log_memory("In Process Scan")
         features = radar_processor.extract_features(path)
         ts_safe = features.timestamp.replace(":", "-").replace(".", "-")[:19]
         img_path = images_dir / f"{ts_safe}_reflectivity.png"
@@ -473,15 +470,13 @@ def _process_radar(
     radar_site_lon: float | None,
     event_name: str,
     progress: Callable[[str], None] | None = None,
-) -> tuple[list, list, list, dict]:
+) -> tuple[list, list, dict]:
     """Download and process radar scans. Returns (radar_features, radar_images)."""
 
     def _p(msg: str) -> None:
         print(msg)
         if progress:
             progress(msg)
-
-    _log_memory("Before Process Radar")
 
     all_scans = nexrad.list_scans(radar_site, start, end)
     key_scans = nexrad.pick_key_scans(all_scans, max_scans=max_radar_scans)
@@ -491,25 +486,24 @@ def _process_radar(
     print(f"    Download took {time.time() - t0:.1f}s")
 
     t1 = time.time()
-    max_workers_env = int(os.environ.get("RADAR_MAX_WORKERS", os.cpu_count() or 4))
+    max_workers_env = int(os.environ.get("RADAR_MAX_WORKERS", 8))
     print(
         f"  RADAR_MAX_WORKERS env: {os.environ.get('RADAR_MAX_WORKERS')} -> using {max_workers_env} workers"
     )
     workers = min(len(local_paths), max_workers_env)
     results: dict[int, tuple[dict, str]] = {}
 
-    vad_data = None
-    if local_paths:
-        try:
-            vad_data = sounding.extract_vad(local_paths[0])
-        except Exception as e:
-            print(f"    VAD extraction failed: {e}")
-
     with ProcessPoolExecutor(max_workers=workers) as ex:
-        _log_memory("Before Process Scan")
+
+        vad_futures = (
+            ex.submit(sounding.extract_vad, local_paths[0]) if local_paths else None
+        )
+
         futures = {
             ex.submit(
                 _process_scan,
+                i,
+                workers,
                 path,
                 images_dir,
                 zoom_lat,
@@ -535,6 +529,13 @@ def _process_radar(
             if result is not None:
                 results[i] = result
 
+    vad_data = None
+    if vad_futures is not None:
+        try:
+            vad_data = vad_futures.result()
+        except Exception as e:
+            _p(f"    VAD extraction failed: {e}")
+
     # Reassemble in original scan order, not completion order
     radar_features = [results[i][0] for i in sorted(results)]
     radar_images = [results[i][1] for i in sorted(results)]
@@ -550,8 +551,7 @@ def _process_radar(
         except Exception:
             pass
 
-    _log_memory("After Process Radar")
-    return radar_features, radar_images, local_paths, vad_data or {}
+    return radar_features, radar_images, vad_data or {}
 
 
 def _write_outputs(
@@ -714,7 +714,7 @@ def run_pipeline(
 
     # Step 2: process radar
     if avail.radar:
-        radar_features, radar_images, local_paths, vad_data = _process_radar(
+        radar_features, radar_images, vad_data = _process_radar(
             radar_site,
             start,
             end,
@@ -730,13 +730,11 @@ def run_pipeline(
         )
     else:
         print("  Skipping radar (no coverage for this event)")
-        radar_features, radar_images, local_paths = [], [], []
+        radar_features, radar_images, vad_data = [], [], {}
 
     # Step 2a: fetch pre-event sounding data - hodograph
     sounding_indices = {}
     sounding_image = None
-    hodograph_image = None
-    vad_srh = {}
 
     if avail.radar:
         raw_sounding = sounding.fetch_sounding(zoom_lat, zoom_lon, start)
@@ -752,9 +750,9 @@ def run_pipeline(
                     f"Shear={sounding_indices.get('bulk_shear_06km_kt')} kt"
                 )
 
-    # VAD hodograph from first radar scan
-    if local_paths:
-        _progress("  Extracting VAD winds from radar...")
+        # VAD hodograph (extracted in _process_radar from the first scan)
+        vad_srh = {}
+        hodograph_image = None
         if vad_data:
             vad_srh = sounding.compute_srh(vad_data)
             hodo_path = images_dir / "hodograph.png"
