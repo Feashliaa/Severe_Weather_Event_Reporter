@@ -5,6 +5,7 @@ Fetches pre-event atmospheric profile, and computes severe weather indices.
 With that it renders a Skew-T diagram and a report of the indices.
 
 """
+
 import math, httpx, pyart, matplotlib, json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -12,13 +13,15 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import metpy.calc as mpcalc
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from src import config
 
 from metpy.calc import (
-    cape_cin, parcel_profile,
+    cape_cin,
+    parcel_profile,
 )
 from metpy.units import units as munits
 from metpy.plots import SkewT, Hodograph
@@ -30,6 +33,7 @@ SOUNDING_CACHE_DIR = config.CACHE_DIR / "soundings"
 # CONUS upper air stations — ICAO id, lat, lon
 # Source: NWS upper air network, stable since ~1990
 _UA_STATIONS = [
+    ("BNA", 36.25, -86.57),  # Nashville TN
     ("OAX", 41.32, -96.37),  # Omaha NE
     ("TOP", 39.07, -95.62),  # Topeka KS
     ("SGF", 37.23, -93.40),  # Springfield MO
@@ -38,7 +42,7 @@ _UA_STATIONS = [
     ("FWD", 32.83, -97.30),  # Fort Worth TX
     ("OUN", 35.18, -97.44),  # Norman OK
     ("DDC", 37.77, -99.97),  # Dodge City KS
-    ("LBF", 41.13, -100.68), # North Platte NE
+    ("LBF", 41.13, -100.68),  # North Platte NE
     ("ABR", 45.45, -98.41),  # Aberdeen SD
     ("MPX", 44.85, -93.57),  # Minneapolis MN
     ("GRB", 44.50, -88.13),  # Green Bay WI
@@ -59,9 +63,9 @@ _UA_STATIONS = [
     ("JAN", 32.32, -90.08),  # Jackson MS
     ("LIX", 30.33, -89.83),  # New Orleans LA
     ("SHV", 32.45, -93.82),  # Shreveport LA
-    ("AMA", 35.23, -101.70), # Amarillo TX
-    ("MAF", 31.94, -102.19), # Midland TX
-    ("DRT", 29.37, -100.92), # Del Rio TX
+    ("AMA", 35.23, -101.70),  # Amarillo TX
+    ("MAF", 31.94, -102.19),  # Midland TX
+    ("DRT", 29.37, -100.92),  # Del Rio TX
     ("BRO", 25.92, -97.42),  # Brownsville TX
     ("CRP", 27.77, -97.51),  # Corpus Christi TX
     ("FFC", 33.36, -84.57),  # Peachtree City GA
@@ -72,26 +76,26 @@ _UA_STATIONS = [
     ("GYX", 43.89, -70.26),  # Gray ME
     ("ALY", 42.75, -73.80),  # Albany NY
     ("MPV", 44.20, -72.56),  # Montpelier VT
-    ("GJT", 39.12, -108.53), # Grand Junction CO
-    ("DNR", 39.75, -104.87), # Denver CO
-    ("UNR", 44.07, -103.22), # Rapid City SD
-    ("BIS", 46.77, -100.75), # Bismarck ND
-    ("GGW", 48.21, -106.62), # Glasgow MT
-    ("TFX", 47.46, -111.38), # Great Falls MT
-    ("SLC", 40.77, -111.97), # Salt Lake City UT
-    ("BOI", 43.57, -116.22), # Boise ID
-    ("GEG", 47.63, -117.53), # Spokane WA
-    ("UIL", 47.95, -124.55), # Quillayute WA
-    ("REV", 39.57, -119.80), # Reno NV
-    ("VBG", 34.73, -120.57), # Vandenberg CA
-    ("NKX", 32.87, -117.13), # San Diego CA
-    ("OAK", 37.73, -122.22), # Oakland CA
-    ("MFR", 42.37, -122.87), # Medford OR
-    ("OTX", 47.68, -117.63), # Spokane WA
-    ("FGZ", 35.23, -111.82), # Flagstaff AZ
-    ("TUS", 32.12, -110.92), # Tucson AZ
-    ("EPZ", 31.87, -106.70), # El Paso TX
-    ("ABQ", 35.05, -106.53), # Albuquerque NM
+    ("GJT", 39.12, -108.53),  # Grand Junction CO
+    ("DNR", 39.75, -104.87),  # Denver CO
+    ("UNR", 44.07, -103.22),  # Rapid City SD
+    ("BIS", 46.77, -100.75),  # Bismarck ND
+    ("GGW", 48.21, -106.62),  # Glasgow MT
+    ("TFX", 47.46, -111.38),  # Great Falls MT
+    ("SLC", 40.77, -111.97),  # Salt Lake City UT
+    ("BOI", 43.57, -116.22),  # Boise ID
+    ("GEG", 47.63, -117.53),  # Spokane WA
+    ("UIL", 47.95, -124.55),  # Quillayute WA
+    ("REV", 39.57, -119.80),  # Reno NV
+    ("VBG", 34.73, -120.57),  # Vandenberg CA
+    ("NKX", 32.87, -117.13),  # San Diego CA
+    ("OAK", 37.73, -122.22),  # Oakland CA
+    ("MFR", 42.37, -122.87),  # Medford OR
+    ("OTX", 47.68, -117.63),  # Spokane WA
+    ("FGZ", 35.23, -111.82),  # Flagstaff AZ
+    ("TUS", 32.12, -110.92),  # Tucson AZ
+    ("EPZ", 31.87, -106.70),  # El Paso TX
+    ("ABQ", 35.05, -106.53),  # Albuquerque NM
     ("AHN", 33.95, -83.32),  # Athens GA
     ("LZK", 34.84, -92.26),  # Little Rock AR
     ("SGF", 37.23, -93.40),  # Springfield MO
@@ -103,101 +107,103 @@ _UA_STATIONS = [
     ("RAX", 35.66, -78.49),  # Raleigh NC
 ]
 
+
 def extract_vad(radar_path: Path) -> dict | None:
     """Extract VAD wind profile from a NEXRAD Level II File."""
     try:
         radar = pyart.io.read_nexrad_archive(str(radar_path))
-        if 'velocity' not in radar.fields:
+        if "velocity" not in radar.fields:
             return None
-        
+
         vad = pyart.retrieve.vad_browning(
-            radar, 'velocity',
-            z_want=np.arange(500, 10000, 500)
+            radar, "velocity", z_want=np.arange(500, 10000, 500)
         )
 
         mask = ~np.ma.getmaskarray(np.ma.array(vad.u_wind))
         if not mask.any():
             return None
-        
-        return{
-            'u_wind': [float(x) for x in np.array(vad.u_wind)[mask]],
-            'v_wind': [float(x) for x in np.array(vad.v_wind)[mask]],
-            'height_m': [float(x) for x in np.array(vad.height)[mask]],
+
+        return {
+            "u_wind": [float(x) for x in np.array(vad.u_wind)[mask]],
+            "v_wind": [float(x) for x in np.array(vad.v_wind)[mask]],
+            "height_m": [float(x) for x in np.array(vad.height)[mask]],
         }
     except Exception as e:
         print(f"    Vad extraction failed: {e}")
         return None
-    
+
 
 def compute_srh(vad_data: dict) -> dict:
     """Compute SRH from VAD wind profile"""
     try:
-        u = np.array(vad_data['u_wind']) * munits('m/s')
-        v = np.array(vad_data['v_wind']) * munits('m/s')
-        h = np.array(vad_data['height_m']) * munits('m')
+        u = np.array(vad_data["u_wind"]) * munits("m/s")
+        v = np.array(vad_data["v_wind"]) * munits("m/s")
+        h = np.array(vad_data["height_m"]) * munits("m")
 
         srh_01 = mpcalc.storm_relative_helicity(h, u, v, depth=1000 * munits.m)
         srh_03 = mpcalc.storm_relative_helicity(h, u, v, depth=3000 * munits.m)
 
         return {
-            'srh_01km': round(float(srh_01[2].magnitude)),
-            'srh_03km': round(float(srh_03[2].magnitude)),
+            "srh_01km": round(float(srh_01[2].magnitude)),
+            "srh_03km": round(float(srh_03[2].magnitude)),
         }
     except Exception as e:
         print(f"    SRH computation failed: {e}")
         return {}
 
+
 def render_hodograph(vad_data: dict, output_path: Path) -> Path | None:
     """Render Hodograph from VAD wind profile."""
     try:
-        u = np.array(vad_data['u_wind']) * munits('m/s')
-        v = np.array(vad_data['v_wind']) * munits('m/s')
-        h = np.array(vad_data['height_m']) * munits('m')
+        u = np.array(vad_data["u_wind"]) * munits("m/s")
+        v = np.array(vad_data["v_wind"]) * munits("m/s")
+        h = np.array(vad_data["height_m"]) * munits("m")
 
         fig, ax = plt.subplots(figsize=(5, 5), dpi=90)
-        fig.patch.set_facecolor('#1c2b3a')
-        ax.set_facecolor('#1c2b3a')
+        fig.patch.set_facecolor("#1c2b3a")
+        ax.set_facecolor("#1c2b3a")
 
         h_obj = Hodograph(ax, component_range=50)
-        h_obj.add_grid(increment=10, color='white', alpha=0.2)
-        h_obj.plot_colormapped(u, v, h, cmap='jet')
+        h_obj.add_grid(increment=10, color="white", alpha=0.2)
+        h_obj.plot_colormapped(u, v, h, cmap="jet")
 
-        ax.tick_params(colors='white')
+        ax.tick_params(colors="white")
         for spine in ax.spines.values():
-            spine.set_edgecolor('#3a4a5c')
+            spine.set_edgecolor("#3a4a5c")
 
-        plt.title('VAD Hodograph', color='white', fontsize=10)
+        plt.title("VAD Hodograph", color="white", fontsize=10)
         plt.tight_layout()
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=90, facecolor='#1c2b3a', bbox_inches='tight')
+        plt.savefig(output_path, dpi=90, facecolor="#1c2b3a", bbox_inches="tight")
         plt.close(fig)
         return output_path
     except Exception as e:
         print(f"    Hodograph render failed: {e}")
         return None
 
+
 def _nearest_station(lat: float, lon: float) -> str | None:
-    """Find nearest upper air station to given coordinates."""
-    best = None
-    best_dist = float('inf')
+    best, best_dist = None, float("inf")
+    coslat = math.cos(math.radians(lat))
     for station_id, slat, slon in _UA_STATIONS:
-        dist = math.sqrt((lat - slat) ** 2 + (lon - slon) ** 2)
+        dist = math.hypot(lat - slat, (lon - slon) * coslat)
         if dist < best_dist:
-            best_dist = dist
-            best = station_id
+            best_dist, best = dist, station_id
     return best
+
 
 def _pick_sounding_time(event_start: datetime) -> list[str]:
     """Return candidate sounding times to try, in preference order."""
     hour = event_start.hour
     date = event_start.strftime("%Y%m%d")
     prev_date = (event_start - timedelta(days=1)).strftime("%Y%m%d")
-    
+
     if hour < 12:
         return [f"{date}00", f"{prev_date}12"]
     else:
         return [f"{date}12", f"{date}00"]
+
 
 def _fetch_wyoming(station: str, dt: datetime) -> dict | None:
     """Fetch sounding from University of Wyoming via siphon."""
@@ -208,14 +214,30 @@ def _fetch_wyoming(station: str, dt: datetime) -> dict | None:
 
         profile = []
         for _, row in df.iterrows():
-            profile.append({
-                'pres': float(row['pressure']) if not pd.isna(row['pressure']) else None,
-                'hght': float(row['height']) if not pd.isna(row['height']) else None,
-                'tmpc': float(row['temperature']) if not pd.isna(row['temperature']) else None,
-                'dwpc': float(row['dewpoint']) if not pd.isna(row['dewpoint']) else None,
-                'drct': float(row['direction']) if not pd.isna(row['direction']) else None,
-                'sknt': float(row['speed']) if not pd.isna(row['speed']) else None,
-            })
+            profile.append(
+                {
+                    "pres": (
+                        float(row["pressure"]) if not pd.isna(row["pressure"]) else None
+                    ),
+                    "hght": (
+                        float(row["height"]) if not pd.isna(row["height"]) else None
+                    ),
+                    "tmpc": (
+                        float(row["temperature"])
+                        if not pd.isna(row["temperature"])
+                        else None
+                    ),
+                    "dwpc": (
+                        float(row["dewpoint"]) if not pd.isna(row["dewpoint"]) else None
+                    ),
+                    "drct": (
+                        float(row["direction"])
+                        if not pd.isna(row["direction"])
+                        else None
+                    ),
+                    "sknt": float(row["speed"]) if not pd.isna(row["speed"]) else None,
+                }
+            )
 
         return {
             "station": station,
@@ -225,6 +247,7 @@ def _fetch_wyoming(station: str, dt: datetime) -> dict | None:
     except Exception as e:
         print(f"  Wyoming sounding fetch failed: {e}")
         return None
+
 
 def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None:
     """Fetch nearest pre-event sounding. Returns parsed profile dict or None."""
@@ -246,9 +269,11 @@ def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None
             data = json.loads(iem_cache.read_text())
         else:
             try:
-                r = httpx.get(RAOB_ENDPOINT, params={
-                    "ts": ts, "station": station, "fmt": "json"
-                }, timeout=30.0)
+                r = httpx.get(
+                    RAOB_ENDPOINT,
+                    params={"ts": ts, "station": station, "fmt": "json"},
+                    timeout=30.0,
+                )
                 r.raise_for_status()
                 data = r.json()
                 iem_cache.write_text(r.text)
@@ -258,7 +283,9 @@ def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None
 
         profiles = data.get("profiles", [])
         if profiles:
-            print(f"  Sounding: got IEM profile with {len(profiles[0]['profile'])} levels")
+            print(
+                f"  Sounding: got IEM profile with {len(profiles[0]['profile'])} levels"
+            )
             return {
                 "station": station,
                 "valid": profiles[0].get("valid"),
@@ -277,14 +304,40 @@ def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None
             if df is not None and not df.empty:
                 profile = []
                 for _, row in df.iterrows():
-                    profile.append({
-                        'pres': float(row['pressure']) if not pd.isna(row['pressure']) else None,
-                        'hght': float(row['height']) if not pd.isna(row['height']) else None,
-                        'tmpc': float(row['temperature']) if not pd.isna(row['temperature']) else None,
-                        'dwpc': float(row['dewpoint']) if not pd.isna(row['dewpoint']) else None,
-                        'drct': float(row['direction']) if not pd.isna(row['direction']) else None,
-                        'sknt': float(row['speed']) if not pd.isna(row['speed']) else None,
-                    })
+                    profile.append(
+                        {
+                            "pres": (
+                                float(row["pressure"])
+                                if not pd.isna(row["pressure"])
+                                else None
+                            ),
+                            "hght": (
+                                float(row["height"])
+                                if not pd.isna(row["height"])
+                                else None
+                            ),
+                            "tmpc": (
+                                float(row["temperature"])
+                                if not pd.isna(row["temperature"])
+                                else None
+                            ),
+                            "dwpc": (
+                                float(row["dewpoint"])
+                                if not pd.isna(row["dewpoint"])
+                                else None
+                            ),
+                            "drct": (
+                                float(row["direction"])
+                                if not pd.isna(row["direction"])
+                                else None
+                            ),
+                            "sknt": (
+                                float(row["speed"])
+                                if not pd.isna(row["speed"])
+                                else None
+                            ),
+                        }
+                    )
                 result = {
                     "station": station,
                     "valid": dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -304,6 +357,7 @@ def fetch_sounding(lat: float, lon: float, event_start: datetime) -> dict | None
     print(f"  Sounding: no data found across IEM and Wyoming for {station}")
     return None
 
+
 def compute_indices(sounding: dict) -> dict:
     """Compute severe weather indices from sounding profile."""
     try:
@@ -311,16 +365,16 @@ def compute_indices(sounding: dict) -> dict:
 
         # Filter to levels with complete thermodynamic data
         thermo = [
-            (p['pres'], p['hght'], p['tmpc'], p['dwpc'])
+            (p["pres"], p["hght"], p["tmpc"], p["dwpc"])
             for p in profile
-            if all(p.get(k) is not None for k in ['pres', 'hght', 'tmpc', 'dwpc'])
+            if all(p.get(k) is not None for k in ["pres", "hght", "tmpc", "dwpc"])
         ]
 
         # Filter to levels with wind data
         wind_levels = [
-            (p['pres'], p['drct'], p['sknt'])
+            (p["pres"], p["drct"], p["sknt"])
             for p in profile
-            if all(p.get(k) is not None for k in ['pres', 'drct', 'sknt'])
+            if all(p.get(k) is not None for k in ["pres", "drct", "sknt"])
         ]
 
         if len(thermo) < 5:
@@ -361,7 +415,7 @@ def compute_indices(sounding: dict) -> dict:
             top_u = float(u[idx_500].magnitude)
             top_v = float(v[idx_500].magnitude)
 
-            shear_mag = math.sqrt((top_u - sfc_u)**2 + (top_v - sfc_v)**2)
+            shear_mag = math.sqrt((top_u - sfc_u) ** 2 + (top_v - sfc_v) ** 2)
             indices["bulk_shear_06km_kt"] = round(shear_mag)
 
         # Surface conditions
@@ -375,19 +429,20 @@ def compute_indices(sounding: dict) -> dict:
         print(f"  Sounding indices failed: {e}")
         return {}
 
+
 def render_skewt(sounding: dict, output_path: Path) -> Path | None:
     """Render a Skew-T log-P diagram and save as PNG."""
     try:
         profile = sounding["profile"]
         thermo = [
-            (p['pres'], p['tmpc'], p['dwpc'])
+            (p["pres"], p["tmpc"], p["dwpc"])
             for p in profile
-            if all(p.get(k) is not None for k in ['pres', 'tmpc', 'dwpc'])
+            if all(p.get(k) is not None for k in ["pres", "tmpc", "dwpc"])
         ]
         wind_levels = [
-            (p['pres'], p['drct'], p['sknt'])
+            (p["pres"], p["drct"], p["sknt"])
             for p in profile
-            if all(p.get(k) is not None for k in ['pres', 'drct', 'sknt'])
+            if all(p.get(k) is not None for k in ["pres", "drct", "sknt"])
         ]
         if len(thermo) < 5:
             return None
@@ -397,48 +452,56 @@ def render_skewt(sounding: dict, output_path: Path) -> Path | None:
         dwpc = np.array([t[2] for t in thermo]) * munits.degC
 
         fig = plt.figure(figsize=(10, 7), dpi=90)
-        fig.patch.set_facecolor('#1c2b3a')
+        fig.patch.set_facecolor("#1c2b3a")
 
-        gs = fig.add_gridspec(1, 2, width_ratios=[5, 1], wspace=0.02,
-                              left=0.05, right=0.95, top=0.93, bottom=0.07)
+        gs = fig.add_gridspec(
+            1,
+            2,
+            width_ratios=[5, 1],
+            wspace=0.02,
+            left=0.05,
+            right=0.95,
+            top=0.93,
+            bottom=0.07,
+        )
 
         skew = SkewT(fig, rotation=45, subplot=gs[0])
-        skew.ax.set_facecolor('#1c2b3a')
+        skew.ax.set_facecolor("#1c2b3a")
 
-        skew.plot(pres, tmpc, 'r', linewidth=2, label='Temperature')
-        skew.plot(pres, dwpc, 'g', linewidth=2, label='Dewpoint')
+        skew.plot(pres, tmpc, "r", linewidth=2, label="Temperature")
+        skew.plot(pres, dwpc, "g", linewidth=2, label="Dewpoint")
 
         parcel = parcel_profile(pres, tmpc[0], dwpc[0])
-        skew.plot(pres, parcel.to('degC'), 'k--', linewidth=1.5, label='Parcel Path')
+        skew.plot(pres, parcel.to("degC"), "k--", linewidth=1.5, label="Parcel Path")
         skew.shade_cape(pres, tmpc, parcel)
         skew.shade_cin(pres, tmpc, parcel, dwpc)
 
-        skew.plot_dry_adiabats(alpha=0.3, colors='#ff6b35')
-        skew.plot_moist_adiabats(alpha=0.3, colors='#4ecdc4')
-        skew.plot_mixing_lines(alpha=0.3, colors='#95e1d3')
+        skew.plot_dry_adiabats(alpha=0.3, colors="#ff6b35")
+        skew.plot_moist_adiabats(alpha=0.3, colors="#4ecdc4")
+        skew.plot_mixing_lines(alpha=0.3, colors="#95e1d3")
 
         skew.ax.set_ylim(1000, 100)
         skew.ax.set_xlim(-40, 50)
-        skew.ax.tick_params(colors='white')
-        skew.ax.xaxis.label.set_color('white')
+        skew.ax.tick_params(colors="white")
+        skew.ax.xaxis.label.set_color("white")
         skew.ax.xaxis.label.set_text("Temperature (°C)")
         skew.ax.yaxis.label.set_text("Pressure (hPa)")
-        skew.ax.yaxis.label.set_color('white')
+        skew.ax.yaxis.label.set_color("white")
         for spine in skew.ax.spines.values():
-            spine.set_edgecolor('#3a4a5c')
+            spine.set_edgecolor("#3a4a5c")
 
         # Wind barb panel
         ax_barbs = fig.add_subplot(gs[1])
-        ax_barbs.set_facecolor('#1c2b3a')
+        ax_barbs.set_facecolor("#1c2b3a")
         ax_barbs.set_ylim(1050, 100)
         ax_barbs.set_xlim(-1, 1)
         ax_barbs.set_xticks([])
         ax_barbs.set_yticks([])
-        ax_barbs.tick_params(axis='y', left=False, right=False)
-        ax_barbs.set_title('Wind\n(kt)', color='white', fontsize=7, pad=4)
+        ax_barbs.tick_params(axis="y", left=False, right=False)
+        ax_barbs.set_title("Wind\n(kt)", color="white", fontsize=7, pad=4)
         ax_barbs.set_clip_on(True)
         for spine in ax_barbs.spines.values():
-            spine.set_edgecolor('#3a4a5c')
+            spine.set_edgecolor("#3a4a5c")
 
         if wind_levels:
             wpres = np.array([w[0] for w in wind_levels]) * munits.hPa
@@ -452,14 +515,16 @@ def render_skewt(sounding: dict, output_path: Path) -> Path | None:
                 wpres[mask][::3].magnitude,
                 u[mask][::3].magnitude,
                 v[mask][::3].magnitude,
-                color='white', length=6, linewidth=0.8
+                color="white",
+                length=6,
+                linewidth=0.8,
             )
 
         title = f"Sounding | {sounding['station']} {sounding.get('valid', '')[:13].replace('T', ' ')}Z"
-        fig.suptitle(title, color='white', fontsize=11, y=0.98)
+        fig.suptitle(title, color="white", fontsize=11, y=0.98)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=90, facecolor='#1c2b3a')
+        plt.savefig(output_path, dpi=90, facecolor="#1c2b3a")
         plt.close(fig)
         return output_path
 
