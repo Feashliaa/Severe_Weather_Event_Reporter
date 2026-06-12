@@ -486,7 +486,7 @@ def _process_radar(
     print(f"    Download took {time.time() - t0:.1f}s")
 
     t1 = time.time()
-    max_workers_env = int(os.environ.get("RADAR_MAX_WORKERS", 8))
+    max_workers_env = int(os.environ.get("RADAR_MAX_WORKERS", 4))
     print(
         f"  RADAR_MAX_WORKERS env: {os.environ.get('RADAR_MAX_WORKERS')} -> using {max_workers_env} workers"
     )
@@ -735,6 +735,8 @@ def run_pipeline(
     # Step 2a: fetch pre-event sounding data - hodograph
     sounding_indices = {}
     sounding_image = None
+    vad_srh = {}
+    hodograph_image = None
 
     if avail.radar:
         raw_sounding = sounding.fetch_sounding(zoom_lat, zoom_lon, start)
@@ -751,8 +753,6 @@ def run_pipeline(
                 )
 
         # VAD hodograph (extracted in _process_radar from the first scan)
-        vad_srh = {}
-        hodograph_image = None
         if vad_data:
             vad_srh = sounding.compute_srh(vad_data)
             hodo_path = images_dir / "hodograph.png"
