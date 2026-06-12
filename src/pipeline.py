@@ -482,7 +482,8 @@ def _process_radar(
     print(f"    Download took {time.time() - t0:.1f}s")
 
     t1 = time.time()
-    workers = min(len(local_paths), os.cpu_count() or 4)
+    max_workers_env = int(os.environ.get('RADAR_MAX_WORKERS', os.cpu_count() or 4))
+    workers = min(len(local_paths), max_workers_env)
     results: dict[int, tuple[dict, str]] = {}
 
     vad_data = None
