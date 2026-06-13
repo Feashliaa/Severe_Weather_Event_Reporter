@@ -28,9 +28,21 @@ body {
     border-bottom: 2px solid #facc15;
     padding: 0.5rem 0.75rem;
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 0.25rem 0.75rem;
     color: white;
+}
+
+.tv-header-location {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    color: #facc15;
+    min-width: 0;
+    overflow-wrap: break-word;
 }
 
 .tv-header-tag {
@@ -41,14 +53,6 @@ body {
     padding: 0.15rem 0.5rem;
     letter-spacing: 0.15em;
     font-family: 'Oswald', sans-serif;
-}
-
-.tv-header-location {
-    font-family: 'Oswald', sans-serif;
-    font-weight: 600;
-    font-size: 0.85rem;
-    letter-spacing: 0.1em;
-    color: #facc15;
 }
 
 /* weather.gov style document card */
@@ -221,5 +225,20 @@ details:not([open]) .collapse-marker {
     .bg-\[\#003a8c\] {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+    }
+}
+
+@media (max-width: 640px) {
+    .gov-card .flex-1 {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .gov-card .max-w-md {
+        max-width: 100%;
+    }
+
+    #event-map {
+        max-width: 100%;
     }
 }

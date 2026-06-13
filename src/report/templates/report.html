@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=600">
     <title>{{ report.event_name }} - Severe Weather Event Report</title>
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,25 +49,24 @@
     </section>
     {% endif %}
 
+    <div class="w-fit min-w-full flex flex-col flex-1">
     <!-- "TV Banner" header -->
     <div class="bg-[#003a8c] border-b-4 border-yellow-400">
-        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="bg-yellow-400 hover:bg-yellow-300 font-black px-3 py-1 text-xs tracking-widest transition-colors"
+        <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-y-2">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="bg-yellow-400 hover:bg-yellow-300 font-black px-3 py-1 text-xs tracking-widest transition-colors shrink-0"
                     style="font-family: 'Oswald', sans-serif;">
                     <a href="/" class="text-black text-xs uppercase tracking-widest">SWX</a>
                 </div>
-                <div class="text-white text-xs uppercase tracking-widest font-semibold">Severe Weather Event Reporter
-                </div>
+                <div class="text-white text-xs uppercase tracking-widest font-semibold truncate">
+                    Severe Weather Event Reporter</div>
             </div>
-            <div class="flex items-center gap-4">
-                <span class="text-yellow-400 text-xs font-mono">{{ report.event_date }}</span>
-
+            <div class="flex items-center gap-3 md:gap-4 flex-wrap">
+                <span class="text-yellow-400 text-xs font-mono hidden md:inline">{{ report.event_date }}</span>
                 <a href="javascript:window.print()"
-                    class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">Export PDF</a>
+                    class="text-white text-xs uppercase tracking-widest hover:text-yellow-400 hidden md:inline">Export PDF</a>
                 <a href="/" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">New Report</a>
-                <a href="/gallery" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">Previous
-                    Reports</a>
+                <a href="/gallery" class="text-white text-xs uppercase tracking-widest hover:text-yellow-400">Previous Reports</a>
             </div>
         </div>
     </div>
@@ -75,7 +74,7 @@
     <!-- Sticky section nav -->
     <nav class="sticky top-0 z-40 bg-[#003a8c] border-b-2 border-yellow-400 shadow-md">
         <div class="max-w-5xl mx-auto px-2 md:px-4">
-            <div class="flex overflow-x-auto -mx-2 px-2">
+            <div class="flex overflow-x-auto">
                 {% if report.sounding_image %}<a href="#sounding" class="nav-tab">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round"
@@ -167,15 +166,15 @@
                 <span class="tv-header-location">{{ report.location | upper }}</span>
             </div>
             <div class="bg-gradient-to-b from-[#003a8c] to-[#001f4d] p-6 md:p-10">
-                <h1 class="text-white text-4xl md:text-6xl font-black tracking-tight leading-none drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]"
+                <h1 class="text-white text-3xl sm:text-4xl md:text-6xl font-black tracking-tight leading-none break-words drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]"
                     style="font-family: 'Oswald', sans-serif;">
                     {{ report.event_name | upper }}
                 </h1>
-                <p class="text-yellow-400 text-lg md:text-2xl mt-3 font-bold drop-shadow-[1px_1px_0_rgba(0,0,0,0.5)]"
+                <p class="text-yellow-400 text-lg md:text-2xl mt-3 font-bold break-words drop-shadow-[1px_1px_0_rgba(0,0,0,0.5)]"
                     style="font-family: 'Oswald', sans-serif;">
                     {{ report.event_date }}
                 </p>
-                <p class="text-white mt-4">
+                <p class="text-white mt-4 break-words">
                     The event narrative is AI-generated from structured meteorological data and may contain errors.
                     Verify critical facts against the NCEI, NWS, and LSR data sections below.
                 </p>
@@ -343,12 +342,12 @@
                         {% endif %}
                         {% if report.hodograph_image %}
                         <div>
-                            <p class="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">VAD Hodograph (Event-Time)</p>
-                            <img src="{{ report.hodograph_image }}" alt="VAD Hodograph"
+                            <p class="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">Ambient Hodograph (Event-Time)</p>
+                            <img src="{{ report.hodograph_image }}" alt="Ambient Hodograph"
                                 class="block cursor-zoom-in mx-auto"
                                 style="max-height: 320px; max-width: 320px;"
                                 data-lightbox-src="{{ report.hodograph_image }}"
-                                data-lightbox-caption="VAD Hodograph - derived from radar velocity field">
+                                data-lightbox-caption="Hodograph derived from the pre-event sounding wind profile">
                         </div>
                         {% endif %}
                     </div>
@@ -508,7 +507,7 @@
         {% endif %}
 
         {% if report.radar_images %}
-        <section id=" radar" class="gov-card mb-4 scroll-mt-20">
+        <section id="radar" class="gov-card mb-4 scroll-mt-20">
             <details open>
                 <summary class="gov-card-header cursor-pointer select-none list-none flex justify-between items-center">
                     <span>RADAR LOOP</span>
@@ -814,6 +813,10 @@
         </footer>
     </div>
 
+
+    </div>
+
+
     <!-- Lightbox -->
     <div id="lightbox" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/95 p-4 cursor-zoom-out"
         role="dialog" aria-modal="true" aria-label="Image viewer">
@@ -890,6 +893,18 @@
                 class="text-[#003a8c] font-semibold hover:text-yellow-600 underline">View Source</a>
         </p>
     </footer>
+
+    <script>
+        window.addEventListener('load', function () {
+            var w = document.documentElement.scrollWidth;
+            if (w > document.documentElement.clientWidth) {
+                document.querySelector('meta[name=viewport]')
+                .setAttribute('content', 'width=' + w);
+                window.dispatchEvent(new Event('resize'));
+            }
+        });
+</script>
+
 </body>
 
 </html>
