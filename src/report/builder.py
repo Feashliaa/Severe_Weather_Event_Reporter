@@ -156,12 +156,15 @@ data and keep the report proportionate. Do not pad.
   framing unless matching survey data appears in the data.
 - Do NOT introduce thermodynamic indices (CAPE, CIN, SRH, bulk shear). They are not
   provided for this event and do not apply.
+- Sounding values (CAPE, CIN, SRH, shear) may be displayed for completeness but do
+  NOT characterize this event. Do not infer instability, storm mode, supercell
+  potential, or sounding under-sampling from them. This is not a convective event.
 - The warnings array may be empty for this event type. Do not infer or invent warnings
   that are not listed. If no warnings are present, say so plainly.
 """
 
 
-# --- Classification sets. Extend to match the event_type strings in your NCEI feed. ---
+# --- Classification sets. ---
 TORNADO_TYPES = {"Tornado", "Funnel Cloud"}
 CONVECTIVE_TYPES = {
     "Thunderstorm Wind",
@@ -177,9 +180,6 @@ def generate_narrative(report: EventReport) -> str:
     client = get_client()
 
     # --- Classify the event (tiered) ---
-    # Tornado presence wins outright: a single tornado in a wind-dominated outbreak still
-    # gets tornado framing, because the tornado is the headline. Otherwise fall to the
-    # dominant record type. Wind/hail get the convective module; anything else bails.
     type_counts = Counter(
         e.get("event_type") for e in report.ncei_events if e.get("event_type")
     )
@@ -747,6 +747,8 @@ def compute_summary(report: EventReport) -> dict:
     generate_narrative, not here. This function only feeds the summary cards.
     """
 
+    print(">>> compute_summary BUILD v2 running")
+
     # --- 1. Peak magnitudes across ALL records (independent of attribution) ---
     max_hail_in = None
     max_wind_kt = None
@@ -775,7 +777,6 @@ def compute_summary(report: EventReport) -> dict:
         "Strong Wind",
         "Hail",
         "Marine Hail",
-        "Flash Flood",
         "Lightning",
     }
 
@@ -792,6 +793,14 @@ def compute_summary(report: EventReport) -> dict:
     tor_deaths, tor_damage = _family_tally(TORNADO_FAMILY)
     sev_deaths, sev_damage = _family_tally(SEVERE_FAMILY)
     has_tornado = any(e.get("event_type") == "Tornado" for e in report.ncei_events)
+    has_convective = any(
+        e.get("event_type") in SEVERE_FAMILY for e in report.ncei_events
+    )
+    is_bail = not has_tornado and not has_convective
+
+    print(
+        f">>> has_tornado={has_tornado} has_convective={has_convective} is_bail={is_bail}"
+    )
 
     # Tornado leads the impact attribution only if it actually caused the most harm.
     # Deaths first, damage as tiebreak. Joplin -> tornado. Derecho -> severe weather.
@@ -803,16 +812,21 @@ def compute_summary(report: EventReport) -> dict:
     if tornado_leads:
         impact_types = TORNADO_FAMILY
         impact_label = "tornadoes"
+    elif is_bail:
+        impact_types = None  # count every record
+        impact_label = "all hazards"
     else:
         impact_types = SEVERE_FAMILY
         impact_label = "severe weather"
+
+    print(f">>> label will be: {impact_label}")  # put after the if/elif/else
 
     # --- Impact totals, scoped to the dominant hazard family ---
     total_deaths = 0
     total_injuries = 0
     total_damage = 0.0
     for e in report.ncei_events:
-        if e.get("event_type") in impact_types:
+        if impact_types is None or e.get("event_type") in impact_types:
             total_deaths += e.get("deaths_direct", 0) or 0
             total_injuries += e.get("injuries_direct", 0) or 0
             if e.get("damage_property"):
@@ -907,4 +921,6 @@ def compute_summary(report: EventReport) -> dict:
         "lsr_count": len(report.lsrs),
         "outbreak_context": report.outbreak_context,
         "lead_time": report.lead_time,
+        "is_bail": is_bail,
+        "damage_may_overcount": is_bail,
     }

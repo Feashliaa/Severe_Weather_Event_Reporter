@@ -303,10 +303,15 @@
                             <div class="border border-[#facc15] rounded p-3 text-center">
                                 <div class="text-[#003a8c] text-xs uppercase tracking-wider font-bold mb-1">Warnings
                                 </div>
+                                {% if s.is_bail and s.warning_count == 0 %}
+                                <div class="text-slate-900 text-xl font-black"
+                                    style="font-family: 'Oswald', sans-serif;">N/A</div>
+                                <div class="text-slate-500 text-xs mt-1">not retrieved for this event type</div>
+                                {% else %}
                                 <div class="text-slate-900 text-3xl font-black"
-                                    style="font-family: 'Oswald', sans-serif;">
-                                    {{ s.warning_count }}</div>
+                                    style="font-family: 'Oswald', sans-serif;">{{ s.warning_count }}</div>
                                 <div class="text-slate-500 text-xs mt-1">NWS issued</div>
+                                {% endif %}
                             </div>
 
                             <div class="border border-[#facc15] rounded p-3 text-center">
@@ -328,7 +333,10 @@
                             <div class="text-slate-900 text-2xl font-black" style="font-family: 'Oswald', sans-serif;">
                                 ${{ "{:,.0f}".format(s.total_damage) }}
                             </div>
-                            <div class="text-slate-500 text-xs mt-1">NCEI estimated ({{ s.impact_label }})</div>
+                            <div class="text-slate-500 text-xs mt-1">
+                                NCEI estimated ({{ s.impact_label }}){% if s.damage_may_overcount %} · may include
+                                overlapping basin totals{% endif %}
+                            </div>
                         </div>
                         {% endif %}
 

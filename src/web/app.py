@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.data_sources import geocoding
-from src.pipeline import run_pipeline
+from src.pipeline import run_pipeline, make_slug
 from src.report.builder import EventReport, build_html_string
 from src.feature_gates import feature_availability
 
@@ -182,7 +182,7 @@ async def create_report(req: ReportRequest, background_tasks: BackgroundTasks):
     if end_utc <= start_utc:
         end_utc += timedelta(days=1)
 
-    slug = req.event_name.lower().replace(" ", "_")
+    slug = make_slug(req.event_name)
 
     # If already done, just redirect
     if (config.OUTPUT_DIR / slug / "report_data.json").exists():

@@ -7,7 +7,7 @@ CACHE_PATH = Path(".cache/billion_dollar_disasters.csv")
 
 _DISASTERS: list[dict] | None = None
 
-RELEVANT_TYPES = {"Severe Storm", "Tornado"}
+RELEVANT_TYPES = {"Severe Storm", "Tornado", "Flooding"}
 
 def _load() -> list[dict]:
     global _DISASTERS
