@@ -219,6 +219,8 @@ def fetch_storm_events(
                         "tor_f_scale": row.get("TOR_F_SCALE"),
                         "tor_length_mi": row.get("TOR_LENGTH"),
                         "tor_width_yd": row.get("TOR_WIDTH"),
+                        "magnitude": row.get("MAGNITUDE"),
+                        "magnitude_type": row.get("MAGNITUDE_TYPE"),
                         "episode_id": row.get("EPISODE_ID"),
                         "event_id": row.get("EVENT_ID"),
                         "cz_timezone": row.get("CZ_TIMEZONE"),

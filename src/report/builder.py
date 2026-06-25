@@ -44,60 +44,172 @@ class EventReport:
     vad_srh: dict = field(default_factory=dict)
 
 
-SYSTEM_PROMPT = """You are a meteorologist writing a post-event severe weather report.
+SYSTEM_PROMPT_BASE = """You are a meteorologist writing a post-event severe weather report.
 
 CRITICAL RULES:
 1. Only reference values, times, and facts from the structured data provided.
 2. Do not invent radar values, casualty counts, or any quantitative information.
-3. Do not interpret radar imagery - use only the pre-extracted numeric features.
-4. Do not include any statistics, damage estimates, or impact figures that are not explicitly present in the structured data provided.
-4. If data is incomplete or ambiguous, say so explicitly rather than speculating.
-5. Write in clear, professional prose suitable for a public-facing report.
-6. SYNTHESIZE radar data - describe TRENDS (intensification, weakening, core descent)
-   rather than listing every scan. The radar table renders separately; interpret it, don't transcribe it.
-7. Ignore metadata notes about artifacts, capped values, or diagnostic flags.
-8. Output HTML only. Use <h2>, <p>, <strong>, <ul>, <li>. No markdown, no **, no #.
-9. CONFIDENCE: If a value seems inconsistent with other data, note the uncertainty.
-   Example: "LSRs suggest EF3 damage though the NCEI survey was not yet available at time of writing."
-10. LEAD TIME: If lead time data is provided, include a dedicated paragraph in the
-    warnings section discussing warning effectiveness and lead time.
-11. SOUNDING: If pre-event sounding data is provided, use it in the environmental context
-    section. Reference CAPE, CIN, and bulk shear by name and explain their significance.
-    The sounding station may be far from the event; treat the profile as regional context,
-    not the storm's inflow environment.
-12. SOUNDING LIMITATIONS: If CAPE appears low relative to the observed storm intensity,
-    state plainly that the sounding likely under-samples the warm-sector instability
-    (due to distance from the event, timing, or cold-season regimes where storms are
-    shear-driven with modest CAPE). Do NOT invent warming or destabilization mechanisms.
-    Never attribute instability growth to daytime surface heating for an event occurring
-    at night or in the cold season.
-13. Sounding WINDS: If Sounding wind profile data is provided, use it in the environmental context
-    section alongside the sounding. Sounding winds represent the actual storm-time kinematic
-    environment and are more current than the balloon sounding. Reference SRH by name
-    and explain its role in mesocyclone development.
-14. DATA HIERARCHY: When multiple sources provide the same metric, use this priority order:
-    - Path length/width: DAT surveyed tracks > NCEI episode total > NCEI single county segment
-    - EF rating: NCEI post-survey > LSR preliminary  
-    - Fatalities/injuries: Use COMPUTED TOTALS, not individual NCEI records
-    - Property damage: Suppress if flagged as incomplete
-    Do not cite a single county's path length as the full track length.
+3. Do not interpret radar imagery. Use only the pre-extracted numeric features.
+4. Do not include any statistics, damage estimates, or impact figures that are not
+   explicitly present in the structured data provided.
+5. If data is incomplete or ambiguous, say so explicitly rather than speculating.
+6. Write in clear, professional prose suitable for a public-facing report.
+7. SYNTHESIZE radar data. Describe TRENDS (intensification, weakening, core descent)
+   rather than listing every scan. The radar table renders separately. Interpret it,
+   do not transcribe it.
+8. Describe only the radar trends actually present in this event's scans. Do not define
+   radar concepts generically, and do not mention a signature (core descent, velocity
+   couplet, overshooting top, hail core) unless this event's data shows it.
+9. Ignore metadata notes about artifacts, capped values, or diagnostic flags.
+10. Output HTML only. Use <h2>, <p>, <strong>, <ul>, <li>. No markdown, no **, no #.
+11. CONFIDENCE: If a value seems inconsistent with other data, note the uncertainty.
+    Example: "LSRs suggest EF3 damage though the NCEI survey was not yet available at
+    time of writing."
 
-Structure: overview -> environmental context (include sounding analysis here if available)
--> storm evolution -> warnings issued (include lead time discussion here) -> impacts -> conclusion.
+Structure: overview -> environmental context -> storm evolution -> warnings issued
+-> impacts -> conclusion.
 
-IMPORTANT: Do not reduce detail in the impacts section to accommodate environmental context. 
-Both sections should be equally thorough. The impacts section must reference specific 
-NCEI county records, damage descriptions, and LSR data.
+IMPORTANT: Do not reduce detail in the impacts section to accommodate environmental
+context. Both sections should be equally thorough. The impacts section must reference
+specific NCEI county records, damage descriptions, and LSR data where available.
 """
+
+
+EVENT_MODULE_TORNADO = """
+TORNADO EVENT GUIDANCE (applies in addition to the base rules):
+
+This event produced one or more tornadoes. The tornado is the headline even if wind or
+hail reports outnumber it. Lead with the tornado threat, then cover accompanying wind/hail.
+
+LEAD TIME: If lead time data is provided, include a dedicated paragraph in the warnings
+section discussing warning effectiveness and lead time.
+
+SOUNDING: If pre-event sounding data is provided, use it in the environmental context
+section. Reference CAPE, CIN, and bulk shear by name and explain their significance.
+The sounding station may be far from the event. Treat the profile as regional context,
+not the storm's inflow environment.
+
+SOUNDING LIMITATIONS: If CAPE appears low relative to the observed storm intensity,
+state plainly that the sounding likely under-samples the warm-sector instability (due
+to distance from the event, timing, or cold-season regimes where storms are shear-driven
+with modest CAPE). Do NOT invent warming or destabilization mechanisms. Never attribute
+instability growth to daytime surface heating for an event occurring at night or in the
+cold season.
+
+SOUNDING WINDS: If sounding wind profile data is provided, use it in the environmental
+context section alongside the sounding. Sounding winds represent the actual storm-time
+kinematic environment and are more current than the balloon sounding. Reference SRH by
+name and explain its role in mesocyclone development.
+
+DATA HIERARCHY: When multiple sources provide the same metric, use this priority order:
+- Path length/width: DAT surveyed tracks > NCEI episode total > NCEI single county segment
+- EF rating: NCEI post-survey > LSR preliminary
+- Fatalities/injuries: Use COMPUTED TOTALS, not individual NCEI records
+- Property damage: Suppress if flagged as incomplete
+Do not cite a single county's path length as the full track length.
+"""
+
+
+EVENT_MODULE_CONVECTIVE = """
+CONVECTIVE (WIND / HAIL) EVENT GUIDANCE (applies in addition to the base rules):
+
+This event is convective but NOT tornadic: severe thunderstorm wind and/or hail. Frame
+it as a severe thunderstorm event. There is no tornado in the verified data.
+
+- Do NOT use EF-scale ratings, path length/width, touchdown times, or tornado/mesocyclone
+  framing. There is no touchdown and no tornado lead-time discussion.
+- Report PEAK hail size (inches) and PEAK wind gust from the COMPUTED TOTALS, and support
+  them with specific NCEI county records and LSRs. NCEI MAGNITUDE is hail diameter in
+  inches for Hail records and gust speed in knots for Thunderstorm Wind records.
+  MAGNITUDE_TYPE distinguishes estimated gusts (EG) from measured gusts (MG/MS).
+- Discuss storm mode where the data supports it: organized lines/derecho-type wind events
+  vs discrete cells producing large hail. Do not assert a mode the radar trends do not show.
+
+SOUNDING: If pre-event sounding data is provided, use it in the environmental context
+section. Reference CAPE, CIN, and bulk shear by name. High CAPE supports strong updrafts
+and large hail. Strong deep-layer shear supports organized and supercellular storm modes.
+The sounding station may be far from the event. Treat the profile as regional context.
+
+SOUNDING LIMITATIONS: If CAPE appears low relative to the observed storm intensity, state
+plainly that the sounding likely under-samples the warm-sector instability (due to distance
+or timing). Do NOT invent warming or destabilization mechanisms. Never attribute instability
+growth to daytime surface heating for an event occurring at night or in the cold season.
+
+STORM-RELATIVE HELICITY: If SRH is provided and elevated, note that it indicates supercell
+potential, which is relevant to large-hail and damaging-wind production. Do NOT extend SRH
+into tornado claims. No tornado was verified in this event.
+
+DATA HIERARCHY: Prefer NCEI post-survey magnitudes over preliminary LSR magnitudes. Use
+COMPUTED TOTALS for peak values. Do not re-derive maxima by scanning county records.
+"""
+
+
+EVENT_MODULE_BAIL = """
+NON-CONVECTIVE EVENT GUIDANCE (dominant event type: {dominant_type}):
+
+This event is outside the tool's convective scope. Report only what is present in the
+data and keep the report proportionate. Do not pad.
+
+- Report this event on its own terms, using ONLY the metrics present in the NCEI records,
+  LSRs, and radar features provided.
+- Do NOT introduce tornado, supercell, mesocyclone, EF-scale, hail-core, or severe-storm
+  framing unless matching survey data appears in the data.
+- Do NOT introduce thermodynamic indices (CAPE, CIN, SRH, bulk shear). They are not
+  provided for this event and do not apply.
+- The warnings array may be empty for this event type. Do not infer or invent warnings
+  that are not listed. If no warnings are present, say so plainly.
+"""
+
+
+# --- Classification sets. Extend to match the event_type strings in your NCEI feed. ---
+TORNADO_TYPES = {"Tornado", "Funnel Cloud"}
+CONVECTIVE_TYPES = {
+    "Thunderstorm Wind",
+    "Hail",
+    "Marine Thunderstorm Wind",
+    "Marine Hail",
+    "Lightning",
+}
 
 
 def generate_narrative(report: EventReport) -> str:
     """Call the LLM to generate the narrative section."""
     client = get_client()
 
+    # --- Classify the event (tiered) ---
+    # Tornado presence wins outright: a single tornado in a wind-dominated outbreak still
+    # gets tornado framing, because the tornado is the headline. Otherwise fall to the
+    # dominant record type. Wind/hail get the convective module; anything else bails.
+    type_counts = Counter(
+        e.get("event_type") for e in report.ncei_events if e.get("event_type")
+    )
+    dominant_type = type_counts.most_common(1)[0][0] if type_counts else "Unknown"
+    tornado_count = sum(
+        1 for e in report.ncei_events if e.get("event_type") in TORNADO_TYPES
+    )
+
+    if tornado_count > 0:
+        event_class = "Tornadic"
+        event_module = EVENT_MODULE_TORNADO
+        is_tornadic = True
+        is_convective = True
+    elif dominant_type in CONVECTIVE_TYPES:
+        event_class = "Convective (wind/hail)"
+        event_module = EVENT_MODULE_CONVECTIVE
+        is_tornadic = False
+        is_convective = True
+    else:
+        event_class = dominant_type
+        event_module = EVENT_MODULE_BAIL.format(dominant_type=dominant_type)
+        is_tornadic = False
+        is_convective = False
+
+    system_prompt = SYSTEM_PROMPT_BASE + event_module
+
+    # --- Lead time (tornado-only) ---
     lead_time = report.lead_time
     lead_time_section = ""
-    if lead_time:
+    if lead_time and is_tornadic:
         if lead_time.get("data_quality") == "uncertain":
             lead_time_section = f"""
     WARNING LEAD TIME:
@@ -129,21 +241,20 @@ OUTBREAK CONTEXT (NOAA Billion-Dollar Disasters):
 This event was part of: {report.outbreak_context['name']}
 Total outbreak damage: ${report.outbreak_context['cost_unadjusted']}M (unadjusted)
 Total outbreak deaths: {report.outbreak_context['deaths']}
-Note: This is outbreak-level data, not individual tornado damage.
+Note: This is outbreak-level data, not individual storm damage.
 """
 
+    # --- Sounding (any convective event: CAPE/shear apply to wind/hail too) ---
     sounding_section = ""
-    if report.sounding_indices:
+    if report.sounding_indices and is_convective:
         s = report.sounding_indices
 
-        # Compute how many hours before event the sounding is
         sounding_note = ""
         if s.get("valid"):
             try:
                 from datetime import datetime, timezone
 
                 sounding_dt = datetime.fromisoformat(s["valid"].replace("Z", "+00:00"))
-                # event_start is available via report context - use first radar scan as proxy
                 if report.radar_features:
                     first_scan = datetime.fromisoformat(
                         report.radar_features[0]["timestamp"].replace("Z", "+00:00")
@@ -155,7 +266,7 @@ Note: This is outbreak-level data, not individual tornado damage.
                         sounding_note = (
                             f"This sounding was taken approximately {hours_before} hours before the event "
                             f"and may not represent the storm inflow environment. "
-                            f"Note any discrepancy factually; do not speculate about specific mechanisms "
+                            f"Note any discrepancy factually. Do not speculate about specific mechanisms "
                             f"(such as surface heating) unless the event occurred in the afternoon following "
                             f"a morning sounding."
                         )
@@ -166,19 +277,20 @@ Note: This is outbreak-level data, not individual tornado damage.
 
         sounding_section = f"""
     PRE-EVENT SOUNDING ({s.get('station')} valid {s.get('valid', '')[:19]}Z):
-    Surface conditions: {s.get('sfc_temp_c')}°C temperature / {s.get('sfc_dewpoint_c')}°C dewpoint at {s.get('sfc_pressure_hpa')} hPa
+    Surface conditions: {s.get('sfc_temp_c')}C temperature / {s.get('sfc_dewpoint_c')}C dewpoint at {s.get('sfc_pressure_hpa')} hPa
     CAPE: {s.get('cape_jkg')} J/kg
     - <1000 = marginal, 1000-2500 = moderate, 2500-4000 = significant, >4000 = extreme instability
     CIN: {s.get('cin_jkg')} J/kg
     - Values near 0 = easy convection initiation, more negative = capped atmosphere
     0-6km Bulk Shear: {s.get('bulk_shear_06km_kt')} knots
-    - <30kt = non-supercell, 30-40kt = supercell possible, >40kt = supercell favorable, >60kt = violent tornado potential
+    - <30kt = non-supercell, 30-40kt = supercell possible, >40kt = supercell favorable, >60kt = violent storm potential
     {sounding_note}
     Use these values in the environmental context section to explain the atmospheric setup.
     """
 
+    # --- DAT surveyed tracks (tornado-only) ---
     dat_section = ""
-    if report.dat_tracks:
+    if report.dat_tracks and is_tornadic:
         lines = report.dat_tracks.get("lines", [])
         polygons = report.dat_tracks.get("polygons", [])
         dat_entries = lines + polygons
@@ -198,34 +310,30 @@ Note: This is outbreak-level data, not individual tornado damage.
     Fatalities: {t.get('fatalities', 0)} | Injuries: {t.get('injuries', 0)}
     """
 
+    # --- VAD wind profile (tornado-only: SRH framing leans on mesocyclone/tornado) ---
     vad_section = ""
-    if report.vad_srh:
+    if report.vad_srh and is_tornadic:
         v = report.vad_srh
         vad_section = f"""
     VAD WIND PROFILE (extracted from first radar scan - event-time atmospheric profile):
-    0-1km SRH: {v.get('srh_01km')} m²/s²
+    0-1km SRH: {v.get('srh_01km')} m2/s2
     - <150 = weak rotation potential, 150-300 = moderate, 300-500 = significant, >500 = extreme
-    0-3km SRH: {v.get('srh_03km')} m²/s²
+    0-3km SRH: {v.get('srh_03km')} m2/s2
     - >150 = supercell favorable, >300 = significant tornado potential
-    Note: VAD winds are derived from the radar velocity field at event time - more representative
+    Note: VAD winds are derived from the radar velocity field at event time, more representative
     of the actual storm environment than the pre-event balloon sounding.
     Use these values alongside the sounding to describe the kinematic environment.
     If SRH values are high, discuss their role in supporting mesocyclone development and tornado potential.
     """
 
-    # Compute totals so LLM doesn't have to sum across county records
+    # --- Computed totals ---
     total_deaths = sum(e.get("deaths_direct", 0) or 0 for e in report.ncei_events)
     total_injuries = sum(e.get("injuries_direct", 0) or 0 for e in report.ncei_events)
-    tornado_count = sum(
-        1 for e in report.ncei_events if e.get("event_type") == "Tornado"
-    )
 
-    # Find dominant episode
     tornado_events = [e for e in report.ncei_events if e.get("event_type") == "Tornado"]
     episodes = [e.get("episode_id") for e in tornado_events if e.get("episode_id")]
     dominant_episode = Counter(episodes).most_common(1)[0][0] if episodes else None
 
-    # Sum path lengths within dominant episode
     episode_path_total = 0.0
     for e in report.ncei_events:
         if e.get("event_type") == "Tornado" and e.get("episode_id") == dominant_episode:
@@ -234,23 +342,90 @@ Note: This is outbreak-level data, not individual tornado damage.
             except (ValueError, TypeError):
                 pass
 
+    # Peak wind/hail across NCEI records (magnitude carries gust kt / hail inches)
+    max_hail_in = None
+    max_wind_kt = None
+    for e in report.ncei_events:
+        et = e.get("event_type")
+        raw_mag = e.get("magnitude")
+        try:
+            mag = float(raw_mag) if raw_mag not in (None, "") else None
+        except (ValueError, TypeError):
+            mag = None
+        if mag is None:
+            continue
+        if et in ("Hail", "Marine Hail"):
+            max_hail_in = mag if max_hail_in is None else max(max_hail_in, mag)
+        elif et in ("Thunderstorm Wind", "Marine Thunderstorm Wind"):
+            max_wind_kt = mag if max_wind_kt is None else max(max_wind_kt, mag)
+
     computed_totals = f"""
-    COMPUTED TOTALS (pre-summed across all NCEI county records - use these figures, do not re-sum):
+    COMPUTED TOTALS (pre-summed across all NCEI county records, use these figures, do not re-sum):
     Total direct deaths: {total_deaths}
     Total direct injuries: {total_injuries}
-    Total tornado records: {tornado_count}
-    Dominant episode ID: {dominant_episode}
-    Total path length across all county segments of dominant episode: {round(episode_path_total, 1)} miles
+    Total NCEI records: {len(report.ncei_events)}
+    """
+
+    if tornado_count > 0:
+        computed_totals += f"""Total tornado records: {tornado_count}
+    Total path length across all county segments of dominant tornado system: {round(episode_path_total, 1)} miles
     Note: NCEI records are split by county. Do not report a single county's path length as the total.
     Path lengths summed above represent all county segments of the same tornado system.
-    Note: Do not reference episode IDs, event IDs, or other internal database identifiers in the narrative.
     """
+
+    if max_hail_in is not None:
+        computed_totals += (
+            f"    Peak hail size (NCEI MAGNITUDE): {max_hail_in} inches\n"
+        )
+    if max_wind_kt is not None:
+        computed_totals += f"    Peak thunderstorm wind gust (NCEI MAGNITUDE): {round(max_wind_kt)} kt\n"
+
+    computed_totals += "    Note: Do not reference episode IDs, event IDs, or other internal database identifiers in the narrative.\n"
+
+    # --- Nyquist / velocity pinning: detect in code, inject a note only when it is real ---
+    radar_nyquist_note = ""
+    vel_values = []
+    for scan in report.radar_features or []:
+        for key in ("max_inbound_kt", "max_outbound_kt", "max_inbound", "max_outbound"):
+            val = scan.get(key)
+            if val is not None:
+                try:
+                    vel_values.append(abs(float(val)))
+                except (ValueError, TypeError):
+                    pass
+
+    if vel_values:
+        peak = max(vel_values)
+        pinned_scans = sum(1 for v in vel_values if abs(v - peak) < 0.5)
+        if peak > 0 and pinned_scans >= 2:
+            radar_nyquist_note = (
+                f"\n    NOTE: Max velocity readings reached approximately {round(peak)} kt "
+                f"on {pinned_scans} scans, consistent with the radar's effective measurement "
+                f"limit (Nyquist velocity). State this at most once. Do not claim it proves "
+                f"higher winds.\n"
+            )
+
+    radar_section = f"""
+RADAR FEATURES (extracted from Level II volume scans):
+Fields: timestamp, max reflectivity (dBZ), height of max reflectivity (kft AGL),
+echo tops at 18/50 dBZ (kft), max inbound/outbound velocities (knots).
+Interpret only the trends actually present in these scans. Possible signatures, to be
+mentioned ONLY if this event's data shows them: updraft strengthening (rising echo tops),
+hail core descent (reflectivity max intensifying as its height drops), and mesocyclone
+rotation (a strong velocity couplet).
+{radar_nyquist_note}{json.dumps(report.radar_features, indent=2, default=str)}
+"""
 
     user_prompt = f"""Generate a post-event report narrative for the following event.
 
 EVENT: {report.event_name}
 DATE: {report.event_date}
 LOCATION: {report.location}
+EVENT CLASSIFICATION: {event_class} (dominant NCEI record type: {dominant_type})
+
+Do not introduce tornado, supercell, mesocyclone, or EF-scale framing unless tornado
+records appear below. Match the framing to the classification above. Omit sections that
+have no supporting data rather than speculating to fill them.
 
 --- AUTHORITATIVE SURVEY DATA ---
 
@@ -259,8 +434,8 @@ LOCATION: {report.location}
 {computed_totals}
 
 NCEI STORM EVENTS ({len(report.ncei_events)} records - post-survey verified):
-Prefer these over LSRs for EF ratings, path dimensions, casualties, and damage estimates.
-NCEI records are split by county - use COMPUTED TOTALS and DAT for aggregate figures.
+Prefer these over LSRs for ratings, dimensions, magnitudes, casualties, and damage estimates.
+NCEI records are split by county. Use COMPUTED TOTALS and DAT for aggregate figures.
 {json.dumps(report.ncei_events, indent=2, default=str)}
 
 --- OBSERVATIONAL DATA ---
@@ -271,18 +446,7 @@ WARNINGS ISSUED ({len(report.warnings)} total):
 LOCAL STORM REPORTS ({len(report.lsrs)} total):
 {json.dumps(report.lsrs, indent=2, default=str)}
 
-RADAR FEATURES (extracted from Level II volume scans):
-Fields: timestamp, max reflectivity (dBZ), height of max reflectivity (kft AGL),
-echo tops at 18/50 dBZ (kft), max inbound/outbound velocities (knots).
-Interpret trends:
-- Rising echo tops = updraft strengthening / overshooting tops.
-- High-reflectivity core descent (Max dBZ spikes while height of max reflectivity drops) = significant hail core descent or low-level debris ball signature during maximum tornadic intensity.
-- Strong velocity couplet = mesocyclone rotation.
-CRITICAL RADAR CONSTRAINT:
-If max velocities pin at an identical repeating value across scans, note ONCE that
-velocities reached the radar's effective measurement limit (Nyquist), and do not
-repeat or elaborate on this point. Do not claim it "proves" higher winds.
-{json.dumps(report.radar_features, indent=2, default=str)}
+{radar_section}
 
 --- ATMOSPHERIC CONTEXT ---
 
@@ -298,7 +462,7 @@ repeat or elaborate on this point. Do not claim it "proves" higher winds.
 
 Write the narrative HTML now. Cite specific timestamps and values. Only use data above."""
 
-    raw = client.generate(SYSTEM_PROMPT, user_prompt, max_tokens=8192)
+    raw = client.generate(system_prompt, user_prompt, max_tokens=8192)
     return markdown.markdown(raw, extensions=["extra", "sane_lists"])
 
 
@@ -563,67 +727,129 @@ def _parse_ncei_dt(value: str) -> datetime | None:
 
 
 def compute_summary(report: EventReport) -> dict:
-    """Compute impact summary stats for the report template."""
-    max_ef = None
-    max_ef_rank = -1
+    """Compute impact summary stats for the report template.
+
+    Three decisions are kept SEPARATE here, because conflating them is what put a
+    0.9 mi EFU path at the top of a derecho report and blanked its peak gust:
+
+      1. Peak magnitudes (hail size, wind gust) are scanned across ALL records,
+         regardless of which hazard "leads". A tornadic event can still have a
+         headline-worthy gust.
+      2. Impact attribution (which deaths/injuries/damage the summary reports, and
+         the "tornadoes" vs "severe weather" label) follows whichever hazard caused
+         the MOST harm, by deaths then damage. A token tornado in a wind-driven
+         event does not seize the impact totals.
+      3. Tornado EF rating and path length are computed from tornado records on
+         PRESENCE. They render whenever a tornado occurred; their own template
+         guards decide display. They do not depend on attribution.
+
+    NOTE: the EF2 framing-lead bar (which hazard the narrative leads with) lives in
+    generate_narrative, not here. This function only feeds the summary cards.
+    """
+
+    # --- 1. Peak magnitudes across ALL records (independent of attribution) ---
+    max_hail_in = None
+    max_wind_kt = None
+    for e in report.ncei_events:
+        et = e.get("event_type")
+        mag_raw = e.get("magnitude")
+        try:
+            mag = float(mag_raw) if mag_raw not in (None, "") else None
+        except (ValueError, TypeError):
+            mag = None
+        if mag is None:
+            continue
+        if et in ("Hail", "Marine Hail"):
+            if max_hail_in is None or mag > max_hail_in:
+                max_hail_in = mag
+        elif et in ("Thunderstorm Wind", "Marine Thunderstorm Wind"):
+            if max_wind_kt is None or mag > max_wind_kt:
+                max_wind_kt = mag
+
+    # --- 2. Determine the dominant hazard by CONSEQUENCE, not by presence ---
+    TORNADO_FAMILY = {"Tornado"}
+    SEVERE_FAMILY = {
+        "Thunderstorm Wind",
+        "Marine Thunderstorm Wind",
+        "High Wind",
+        "Strong Wind",
+        "Hail",
+        "Marine Hail",
+        "Flash Flood",
+        "Lightning",
+    }
+
+    def _family_tally(types: set) -> tuple[int, float]:
+        deaths = 0
+        damage = 0.0
+        for e in report.ncei_events:
+            if e.get("event_type") in types:
+                deaths += e.get("deaths_direct", 0) or 0
+                if e.get("damage_property"):
+                    damage += e["damage_property"]
+        return deaths, damage
+
+    tor_deaths, tor_damage = _family_tally(TORNADO_FAMILY)
+    sev_deaths, sev_damage = _family_tally(SEVERE_FAMILY)
+    has_tornado = any(e.get("event_type") == "Tornado" for e in report.ncei_events)
+
+    # Tornado leads the impact attribution only if it actually caused the most harm.
+    # Deaths first, damage as tiebreak. Joplin -> tornado. Derecho -> severe weather.
+    tornado_leads = has_tornado and (
+        tor_deaths > sev_deaths
+        or (tor_deaths == sev_deaths and tor_damage >= sev_damage)
+    )
+
+    if tornado_leads:
+        impact_types = TORNADO_FAMILY
+        impact_label = "tornadoes"
+    else:
+        impact_types = SEVERE_FAMILY
+        impact_label = "severe weather"
+
+    # --- Impact totals, scoped to the dominant hazard family ---
     total_deaths = 0
     total_injuries = 0
     total_damage = 0.0
-    max_path = 0.0
-    total_path = 0.0  # Added to track overall episode footprint
-
-    # Determine the dominant hazard for this report
-    type_counts = Counter(e.get("event_type") for e in report.ncei_events)
-    has_tornado = type_counts.get("Tornado", 0) > 0
-
-    if has_tornado:
-        impact_types = {"Tornado"}
-        impact_label = "tornadoes"
-    else:
-        # Non-tornado event: count the convective wind/hail family
-        impact_types = {
-            "Thunderstorm Wind",
-            "Hail",
-            "Flash Flood",
-            "Strong Wind",
-            "High Wind",
-            "Lightning",
-        }
-        impact_label = "severe weather"
-
-    # Combined into a single loop over events for efficiency
     for e in report.ncei_events:
-        in_scope = e.get("event_type") in impact_types
-        if in_scope:
+        if e.get("event_type") in impact_types:
             total_deaths += e.get("deaths_direct", 0) or 0
             total_injuries += e.get("injuries_direct", 0) or 0
             if e.get("damage_property"):
                 total_damage += e["damage_property"]
 
-            if e.get("tor_length_mi"):
-                try:
-                    length = float(e["tor_length_mi"])
-                    total_path += length  # Sum everything in the county episode
-                    if length > max_path:
-                        max_path = length
-                except (ValueError, TypeError):
-                    pass
+    # --- 3. Tornado EF rating + path length, computed on PRESENCE ---
+    # These come from tornado records regardless of whether the tornado leads impacts,
+    # so a tornado in a wind-driven event still surfaces its rating/track.
+    max_ef = None
+    max_ef_rank = -1
+    max_path = 0.0
+    total_path = 0.0
+    for e in report.ncei_events:
+        if e.get("event_type") != "Tornado":
+            continue
 
-            # Handle normalization for legacy 'F' scales and modern 'EF' scales
-            raw_scale = e.get("tor_f_scale")
-            if raw_scale:
-                # Clean string (e.g., "F5 " or "EF5" -> "5")
-                clean_rating = str(raw_scale).strip().replace("EF", "").replace("F", "")
-                try:
-                    # Use the raw integer digit (0-5) as the rank baseline
-                    rank = int(clean_rating)
-                    if rank > max_ef_rank:
-                        max_ef_rank = rank
-                        max_ef = str(
-                            raw_scale
-                        ).strip()  # Preserves "F5" or "EF5" for the UI
-                except (ValueError, TypeError):
-                    pass
+        raw_scale = e.get("tor_f_scale")
+        if raw_scale:
+            # Normalize legacy 'F' and modern 'EF' (e.g. "F5 "/"EF5" -> "5").
+            # EFU/FU normalize to "U", which int() rejects, so unrated stays rank -1.
+            clean_rating = str(raw_scale).strip().replace("EF", "").replace("F", "")
+            try:
+                rank = int(clean_rating)
+                if rank > max_ef_rank:
+                    max_ef_rank = rank
+                    max_ef = str(raw_scale).strip()  # preserve "F5"/"EF5" for UI
+            except (ValueError, TypeError):
+                pass
+
+        if e.get("tor_length_mi"):
+            try:
+                length = float(e["tor_length_mi"])
+                total_path += length
+                if length > max_path:
+                    max_path = length
+            except (ValueError, TypeError):
+                pass
 
     radar_dbz = [
         f["max_reflectivity_dbz"]
@@ -636,13 +862,13 @@ def compute_summary(report: EventReport) -> dict:
         if f.get("echo_top_18dbz_kft") is not None
     ]
 
-    # Suppress damage if clearly incomplete relative to event severity
+    # Suppress damage if clearly incomplete relative to event severity.
     if max_ef_rank >= 3 and total_damage < 100_000:
         total_damage = None
     elif total_damage < 10_000:
         total_damage = None
 
-    # DAT path length takes priority over NCEI
+    # DAT path length takes priority over NCEI.
     dat_path_mi = None
     path_source = "NCEI"
     if report.dat_tracks:
@@ -656,10 +882,6 @@ def compute_summary(report: EventReport) -> dict:
         if line_lengths:
             dat_path_mi = round(max(line_lengths), 1)
             path_source = "DAT"
-
-    print(
-        f"  >>> DAT lines: {[(t.get('length_mi'), t.get('ef_num')) for t in report.dat_tracks.get('lines', [])]}"
-    )
 
     if dat_path_mi is not None:
         max_path_mi = dat_path_mi
@@ -677,6 +899,8 @@ def compute_summary(report: EventReport) -> dict:
         "max_path_mi": max_path_mi,
         "path_source": path_source,
         "total_path_mi": round(total_path, 1) if total_path > 0 else None,
+        "max_hail_in": max_hail_in,
+        "max_wind_kt": round(max_wind_kt) if max_wind_kt is not None else None,
         "max_dbz": round(max(radar_dbz), 1) if radar_dbz else None,
         "max_tops": round(max(radar_tops), 1) if radar_tops else None,
         "warning_count": len(report.warnings),
