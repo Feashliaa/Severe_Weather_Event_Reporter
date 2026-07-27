@@ -216,7 +216,7 @@ severe_weather_event_reporter/
 
 ## License
 
-MIT License with Commons Clause. Free for personal use and self-hosting. Commercial use requires a separate license - contact [rwdorrington@gmail.com].
+MIT License with Commons Clause. Free for personal use and self-hosting. Commercial use requires a separate license - contact [jobboardaggregator@gmail.com].
 
 See [LICENSE](LICENSE) for full terms.
 
